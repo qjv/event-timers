@@ -2,7 +2,7 @@ use crate::config::{get_track_visual_config, RUNTIME_CONFIG};
 use crate::json_loader::EventTrack;
 use crate::time_utils::{format_time_only, get_current_unix_time};
 use crate::ui::time_ruler::render_time_ruler;
-use nexus::imgui::{Condition, MenuItem, MouseButton, StyleVar, Ui, Window, WindowFlags};
+use nexus::imgui::{ChildWindow, Condition, MenuItem, MouseButton, StyleVar, Ui, Window, WindowFlags};
 use std::collections::HashSet;
 
 pub fn render_main_window(ui: &Ui) {
@@ -69,6 +69,10 @@ pub fn render_main_window(ui: &Ui) {
                     config.show_scrollbar = !show_sb;
                 }
             });
+            
+            // Create a child window for proper scrolling and clipping
+            let content_width = ui.content_region_avail()[0];
+            let content_height = ui.content_region_avail()[1];
             
             if config.show_time_ruler {
                 render_time_ruler(ui, current_time, view_range, time_position);
@@ -216,7 +220,7 @@ fn render_tracks_for_category(
     rendered_categories.insert(category.to_string());
 }
 
-// FIXED: Use foreground draw list with proper clipping
+// FIXED: Use window draw list which automatically clips to window bounds
 fn render_category_header(ui: &Ui, category: &str) {
     let cursor_pos = ui.cursor_screen_pos();
     let available_width = ui.content_region_avail()[0];
@@ -225,31 +229,21 @@ fn render_category_header(ui: &Ui, category: &str) {
     let padding = 2.0;
     let rect_height = text_size[1] + padding * 2.0;
 
-    // Get window position for proper clipping bounds
-    let window_pos = ui.window_pos();
-    let window_size = ui.window_size();
+    // Use window draw list - it automatically clips to the child window's scroll region
+    let draw_list = ui.get_window_draw_list();
     
-    // Use foreground draw list (respects window clipping)
-    let draw_list = ui.get_foreground_draw_list();
+    let rect_start = [cursor_pos[0], cursor_pos[1]];
+    let rect_end = [cursor_pos[0] + available_width, cursor_pos[1] + rect_height];
     
-    // Manually clip to window content region
-    let clip_min = [window_pos[0], window_pos[1]];
-    let clip_max = [window_pos[0] + window_size[0], window_pos[1] + window_size[1]];
-    
-    draw_list.with_clip_rect(clip_min, clip_max, || {
-        let rect_start = [cursor_pos[0], cursor_pos[1]];
-        let rect_end = [cursor_pos[0] + available_width, cursor_pos[1] + rect_height];
-        
-        draw_list.add_rect(rect_start, rect_end, [0.0, 0.0, 0.0, 0.6])
-            .filled(true)
-            .build();
+    draw_list.add_rect(rect_start, rect_end, [0.0, 0.0, 0.0, 0.6])
+        .filled(true)
+        .build();
 
-        let text_pos = [
-            cursor_pos[0] + (available_width - text_size[0]) / 2.0,
-            cursor_pos[1] + padding
-        ];
-        draw_list.add_text(text_pos, [0.9, 0.9, 0.9, 1.0], category);
-    });
+    let text_pos = [
+        cursor_pos[0] + (available_width - text_size[0]) / 2.0,
+        cursor_pos[1] + padding
+    ];
+    draw_list.add_text(text_pos, [0.9, 0.9, 0.9, 1.0], category);
     
     ui.dummy([0.0, rect_height]);
 }
@@ -375,7 +369,18 @@ fn render_timeline_track(
                     .build();
             }
             
-            draw_list.with_clip_rect(bar_min, bar_max, || {
+            // Use window bounds in screen space for clipping (accounts for scroll automatically)
+            let window_pos = ui.window_pos();
+            let window_size = ui.window_size();
+            
+            let window_clip_min = [window_pos[0], window_pos[1]];
+            let window_clip_max = [window_pos[0] + window_size[0], window_pos[1] + window_size[1]];
+            
+            // Intersect event bar bounds with window bounds for text clipping
+            let text_clip_min = [bar_min[0].max(window_clip_min[0]), bar_min[1].max(window_clip_min[1])];
+            let text_clip_max = [bar_max[0].min(window_clip_max[0]), bar_max[1].min(window_clip_max[1])];
+            
+            draw_list.with_clip_rect(text_clip_min, text_clip_max, || {
                 let text_color = get_text_color_for_bg(bar_color);
                 let text_size = ui.calc_text_size(&event.name);
                 let text_pos = [
