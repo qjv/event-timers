@@ -216,9 +216,8 @@ fn render_tracks_for_category(
     rendered_categories.insert(category.to_string());
 }
 
-// Extract category header rendering to reduce code duplication
+// FIXED: Use foreground draw list with proper clipping
 fn render_category_header(ui: &Ui, category: &str) {
-    let draw_list = ui.get_window_draw_list();
     let cursor_pos = ui.cursor_screen_pos();
     let available_width = ui.content_region_avail()[0];
     let text_size = ui.calc_text_size(category);
@@ -226,18 +225,31 @@ fn render_category_header(ui: &Ui, category: &str) {
     let padding = 2.0;
     let rect_height = text_size[1] + padding * 2.0;
 
-    let rect_start = [cursor_pos[0], cursor_pos[1]];
-    let rect_end = [cursor_pos[0] + available_width, cursor_pos[1] + rect_height];
+    // Get window position for proper clipping bounds
+    let window_pos = ui.window_pos();
+    let window_size = ui.window_size();
     
-    draw_list.add_rect(rect_start, rect_end, [0.0, 0.0, 0.0, 0.6])
-        .filled(true)
-        .build();
+    // Use foreground draw list (respects window clipping)
+    let draw_list = ui.get_foreground_draw_list();
+    
+    // Manually clip to window content region
+    let clip_min = [window_pos[0], window_pos[1]];
+    let clip_max = [window_pos[0] + window_size[0], window_pos[1] + window_size[1]];
+    
+    draw_list.with_clip_rect(clip_min, clip_max, || {
+        let rect_start = [cursor_pos[0], cursor_pos[1]];
+        let rect_end = [cursor_pos[0] + available_width, cursor_pos[1] + rect_height];
+        
+        draw_list.add_rect(rect_start, rect_end, [0.0, 0.0, 0.0, 0.6])
+            .filled(true)
+            .build();
 
-    let text_pos = [
-        cursor_pos[0] + (available_width - text_size[0]) / 2.0,
-        cursor_pos[1] + padding
-    ];
-    draw_list.add_text(text_pos, [0.9, 0.9, 0.9, 1.0], category);
+        let text_pos = [
+            cursor_pos[0] + (available_width - text_size[0]) / 2.0,
+            cursor_pos[1] + padding
+        ];
+        draw_list.add_text(text_pos, [0.9, 0.9, 0.9, 1.0], category);
+    });
     
     ui.dummy([0.0, rect_height]);
 }
