@@ -231,7 +231,22 @@ fn get_json_path() -> Option<PathBuf> {
     get_addon_dir("event_timers").map(|p| p.join("event_tracks.json"))
 }
 
+fn extract_embedded_json() {
+    if let Some(path) = get_json_path() {
+        // Only extract if file doesn't exist
+        if !path.exists() {
+            if let Some(dir) = path.parent() {
+                fs::create_dir_all(dir).ok();
+            }
+            fs::write(&path, EMBEDDED_JSON).ok();
+        }
+    }
+}
+
 fn load_json_content() -> String {
+    // First, ensure embedded JSON is extracted
+    extract_embedded_json();
+    
     if let Some(path) = get_json_path() {
         if path.exists() {
             if let Ok(content) = fs::read_to_string(&path) {

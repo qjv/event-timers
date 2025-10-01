@@ -11,7 +11,7 @@ mod time_utils;
 mod ui;
 
 use config::{load_user_config, save_user_config, RUNTIME_CONFIG};
-use ui::{render_main_window, render_settings};
+use ui::{render_main_window, render_settings, check_for_event_tracks_update};
 
 extern "C-unwind" fn toggle_window_keybind(_identifier: *const c_char, is_release: bool) {
     if !is_release {
@@ -32,6 +32,9 @@ nexus::export! {
 
 fn load() {
     load_user_config();
+    
+    // Check for event_tracks.json updates on load
+    check_for_event_tracks_update();
     
     register_keybind_with_string("Toggle Event Timers", toggle_window_keybind, "ALT+E")
         .revert_on_unload();

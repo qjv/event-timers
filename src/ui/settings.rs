@@ -7,6 +7,89 @@ use parking_lot::MutexGuard;
 use crate::config::{RUNTIME_CONFIG, SELECTED_EVENT, SELECTED_TRACK, RuntimeConfig};
 use crate::json_loader::{load_tracks_from_json, EventColor, EventTrack, TimelineEvent};
 
+const GITHUB_EVENT_TRACKS_URL: &str = "https://raw.githubusercontent.com/qjv/event-timers/main/event_tracks.json";
+
+pub fn check_for_event_tracks_update() {
+    use std::thread;
+    
+    thread::spawn(|| {
+        nexus::log::log(
+            nexus::log::LogLevel::Info,
+            "Event Timers",
+            "Checking for event_tracks.json updates from GitHub..."
+        );
+        
+        // Fetch from GitHub using reqwest
+        match reqwest::blocking::get(GITHUB_EVENT_TRACKS_URL) {
+            Ok(response) => {
+                match response.text() {
+                    Ok(github_content) => {
+                        // Read local file
+                        let local_path = nexus::paths::get_addon_dir("event_timers")
+                            .map(|p| p.join("event_tracks.json"));
+                        
+                        if let Some(path) = local_path {
+                            let needs_update = if path.exists() {
+                                match std::fs::read_to_string(&path) {
+                                    Ok(local_content) => local_content != github_content,
+                                    Err(_) => true,
+                                }
+                            } else {
+                                true
+                            };
+                            
+                            if needs_update {
+                                // Backup old file
+                                if path.exists() {
+                                    let backup_path = path.with_extension("json.backup");
+                                    let _ = std::fs::copy(&path, backup_path);
+                                }
+                                
+                                match std::fs::write(&path, github_content) {
+                                    Ok(_) => {
+                                        nexus::log::log(
+                                            nexus::log::LogLevel::Info,
+                                            "Event Timers",
+                                            "event_tracks.json updated! Reload addon (Ctrl+Shift+L) to apply."
+                                        );
+                                    }
+                                    Err(e) => {
+                                        nexus::log::log(
+                                            nexus::log::LogLevel::Critical,
+                                            "Event Timers",
+                                            &format!("Failed to write file: {}", e)
+                                        );
+                                    }
+                                }
+                            } else {
+                                nexus::log::log(
+                                    nexus::log::LogLevel::Info,
+                                    "Event Timers",
+                                    "event_tracks.json is already up to date!"
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        nexus::log::log(
+                            nexus::log::LogLevel::Critical,
+                            "Event Timers",
+                            &format!("Failed to read response: {}", e)
+                        );
+                    }
+                }
+            }
+            Err(e) => {
+                nexus::log::log(
+                    nexus::log::LogLevel::Critical,
+                    "Event Timers",
+                    &format!("Failed to fetch from GitHub: {}", e)
+                );
+            }
+        }
+    });
+}
+
 pub fn render_settings(ui: &Ui) {
     let mut config = RUNTIME_CONFIG.lock();
     
@@ -83,6 +166,17 @@ pub fn render_settings(ui: &Ui) {
         {
         }
     }
+    
+    ui.separator();
+    
+    // Event tracks update section
+    ui.text("Event Tracks Database");
+    
+    if ui.button("Check for Updates") {
+        check_for_event_tracks_update();
+    }
+    ui.same_line();
+    ui.text_disabled("Compare local file with GitHub version");
     
     ui.separator();
     
@@ -207,38 +301,42 @@ pub fn render_settings(ui: &Ui) {
                 
                 ui.indent();
 
-                ui.checkbox(&format!("##vis_{}", track_name), &mut track_visible);
-                if ui.is_item_hovered() {
-                    ui.tooltip_text("Toggle visibility for this track");
-                }
-                
-                // Apply visibility change
-                config.tracks[index].visible = track_visible;
-                
-                ui.same_line();
-                
-                // Reorder buttons for all tracks within category - aligned with placeholders
-                if list_pos > 0 {
-                    if ui.small_button(&format!("Up##up_{}", track_name)) {
-                        let prev_index = track_indices[list_pos - 1];
-                        config.tracks.swap(index, prev_index);
+                if show_vis {
+                    ui.checkbox(&format!("##vis_{}", track_name), &mut track_visible);
+                    if ui.is_item_hovered() {
+                        ui.tooltip_text("Toggle visibility for this track");
                     }
-                } else {
-                    ui.dummy([ui.calc_text_size("Up")[0] + 8.0, 0.0]); // Empty space for alignment
+                    
+                    // Apply visibility change
+                    config.tracks[index].visible = track_visible;
+                    
+                    ui.same_line();
                 }
                 
-                ui.same_line();
-                
-                if list_pos < track_indices.len() - 1 {
-                    if ui.small_button(&format!("Dn##down_{}", track_name)) {
-                        let next_index = track_indices[list_pos + 1];
-                        config.tracks.swap(index, next_index);
+                // Reorder buttons for all tracks within category - only if enabled
+                if show_reorder {
+                    if list_pos > 0 {
+                        if ui.small_button(&format!("Up##up_{}", track_name)) {
+                            let prev_index = track_indices[list_pos - 1];
+                            config.tracks.swap(index, prev_index);
+                        }
+                    } else {
+                        ui.dummy([ui.calc_text_size("Up")[0] + 8.0, 0.0]);
                     }
-                } else {
-                    ui.dummy([ui.calc_text_size("Dn")[0] + 8.0, 0.0]); // Empty space for alignment
+                    
+                    ui.same_line();
+                    
+                    if list_pos < track_indices.len() - 1 {
+                        if ui.small_button(&format!("Dn##down_{}", track_name)) {
+                            let next_index = track_indices[list_pos + 1];
+                            config.tracks.swap(index, next_index);
+                        }
+                    } else {
+                        ui.dummy([ui.calc_text_size("Dn")[0] + 8.0, 0.0]);
+                    }
+                    
+                    ui.same_line();
                 }
-                
-                ui.same_line();
                 
                 if is_default_track {
                     // Default tracks use collapsing header inline editing
