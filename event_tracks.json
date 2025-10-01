@@ -1,0 +1,1651 @@
+{
+  "version": "1.0.0",
+  "hash": "",
+  "categories": [
+    {
+      "name": "Time Cycles",
+      "tracks": [
+        {
+          "name": "Tyria Day/Night Cycle",
+          "timeline_type": "game_time",
+          "base_time_calculator": "tyria_cycle",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Dawn",
+              "offset": 25,
+              "interval": 120,
+              "duration": 5,
+              "color": [
+                0.5,
+                0.7,
+                0.9,
+                1
+              ],
+              "copy_text": ""
+            },
+            {
+              "name": "Day",
+              "offset": 30,
+              "interval": 120,
+              "duration": 70,
+              "color": [
+                1,
+                0.9,
+                0.3,
+                1
+              ],
+              "copy_text": ""
+            },
+            {
+              "name": "Dusk",
+              "offset": 100,
+              "interval": 120,
+              "duration": 5,
+              "color": [
+                0.9,
+                0.5,
+                0.2,
+                1
+              ],
+              "copy_text": ""
+            },
+            {
+              "name": "Night",
+              "offset": 105,
+              "interval": 120,
+              "duration": 40,
+              "color": [
+                0.2,
+                0.2,
+                0.5,
+                1
+              ],
+              "copy_text": ""
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Cantha Day/Night Cycle",
+          "timeline_type": "game_time",
+          "base_time_calculator": "cantha_cycle",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Dawn",
+              "offset": 35,
+              "interval": 120,
+              "duration": 5,
+              "color": [
+                0.6,
+                0.75,
+                0.95,
+                1
+              ],
+              "copy_text": ""
+            },
+            {
+              "name": "Day",
+              "offset": 40,
+              "interval": 120,
+              "duration": 55,
+              "color": [
+                1,
+                0.85,
+                0.4,
+                1
+              ],
+              "copy_text": ""
+            },
+            {
+              "name": "Dusk",
+              "offset": 95,
+              "interval": 120,
+              "duration": 5,
+              "color": [
+                0.85,
+                0.4,
+                0.3,
+                1
+              ],
+              "copy_text": ""
+            },
+            {
+              "name": "Night",
+              "offset": 100,
+              "interval": 120,
+              "duration": 55,
+              "color": [
+                0.1,
+                0.3,
+                0.35,
+                1
+              ],
+              "copy_text": ""
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
+    {
+      "name": "Instances",
+      "tracks": [
+        {
+          "name": "Living World Season 1",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Tower of Nightmares",
+              "offset": 30,
+              "interval": 120,
+              "duration": 20,
+              "color": [
+                0.5,
+                0.8,
+                0.2,
+                1
+              ],
+              "copy_text": "[&BAkMAAA=] or [&BAQAAAA=]"
+            },
+            {
+              "name": "Twisted Marionette",
+              "offset": 60,
+              "interval": 120,
+              "duration": 20,
+              "color": [
+                0.6,
+                0.4,
+                0.2,
+                1
+              ],
+              "copy_text": "[&BAkMAAA=]"
+            },
+            {
+              "name": "Battle for Lion's Arch",
+              "offset": 90,
+              "interval": 120,
+              "duration": 20,
+              "color": [
+                0.2,
+                0.4,
+                0.8,
+                1
+              ],
+              "copy_text": "[&BAkMAAA=] or [&BOMAAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Dragonstorm",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Dragonstorm",
+              "offset": 0,
+              "interval": 120,
+              "duration": 20,
+              "color": [
+                0.8,
+                0.4,
+                1,
+                1
+              ],
+              "copy_text": "[&BAkMAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Convergences",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Outer Nayos",
+              "offset": 90,
+              "interval": 180,
+              "duration": 10,
+              "color": [
+                0.8,
+                0.4,
+                0.9,
+                1
+              ],
+              "copy_text": "[&BB8OAAA=]"
+            },
+            {
+              "name": "Mount Balrior",
+              "offset": 0,
+              "interval": 180,
+              "duration": 10,
+              "color": [
+                0.9,
+                0.4,
+                0.8,
+                1
+              ],
+              "copy_text": "[&BK4OAAA=]"
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
+    {
+      "name": "Base Game",
+      "tracks": [
+        {
+          "name": "World Bosses",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Admiral Taidha Covington",
+              "offset": 0,
+              "interval": 180,
+              "duration": 15,
+              "color": [
+                0.7,
+                0.2,
+                0.2,
+                1
+              ],
+              "copy_text": "[&BKgBAAA=]"
+            },
+            {
+              "name": "Svanir Shaman Chief",
+              "offset": 15,
+              "interval": 120,
+              "duration": 15,
+              "color": [
+                0.4,
+                0.7,
+                0.9,
+                1
+              ],
+              "copy_text": "[&BMIDAAA=]"
+            },
+            {
+              "name": "Megadestroyer",
+              "offset": 30,
+              "interval": 180,
+              "duration": 15,
+              "color": [
+                0.9,
+                0.4,
+                0.1,
+                1
+              ],
+              "copy_text": "[&BM0CAAA=]"
+            },
+            {
+              "name": "Shadow Behemoth",
+              "offset": 45,
+              "interval": 120,
+              "duration": 15,
+              "color": [
+                0.4,
+                0.2,
+                0.6,
+                1
+              ],
+              "copy_text": "[&BPcAAAA=]"
+            },
+            {
+              "name": "The Shatterer",
+              "offset": 60,
+              "interval": 180,
+              "duration": 15,
+              "color": [
+                0.6,
+                0.3,
+                0.8,
+                1
+              ],
+              "copy_text": "[&BE4DAAA=]"
+            },
+            {
+              "name": "Great Jungle Wurm",
+              "offset": 75,
+              "interval": 120,
+              "duration": 15,
+              "color": [
+                0.1,
+                0.5,
+                0.2,
+                1
+              ],
+              "copy_text": "[&BEEFAAA=]"
+            },
+            {
+              "name": "Modniir Ulgoth",
+              "offset": 90,
+              "interval": 180,
+              "duration": 15,
+              "color": [
+                0.6,
+                0.4,
+                0.2,
+                1
+              ],
+              "copy_text": "[&BLAAAAA=]"
+            },
+            {
+              "name": "Fire Elemental",
+              "offset": 105,
+              "interval": 120,
+              "duration": 15,
+              "color": [
+                1,
+                0.3,
+                0.1,
+                1
+              ],
+              "copy_text": "[&BEcAAAA=]"
+            },
+            {
+              "name": "Golem Mark II",
+              "offset": 120,
+              "interval": 180,
+              "duration": 15,
+              "color": [
+                0.3,
+                0.3,
+                0.4,
+                1
+              ],
+              "copy_text": "[&BNQCAAA=]"
+            },
+            {
+              "name": "Claw of Jormag",
+              "offset": 150,
+              "interval": 180,
+              "duration": 15,
+              "color": [
+                0.3,
+                0.6,
+                0.8,
+                1
+              ],
+              "copy_text": "[&BHoCAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Hard World Bosses",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Karka Queen",
+              "offset": 180,
+              "duration": 5,
+              "color": [
+                0.3,
+                0.8,
+                0.7,
+                1
+              ],
+              "copy_text": "[&BNUGAAA=]"
+            },
+            {
+              "name": "Karka Queen",
+              "offset": 450,
+              "duration": 5,
+              "color": [
+                0.3,
+                0.8,
+                0.7,
+                1
+              ],
+              "copy_text": "[&BNUGAAA=]"
+            },
+            {
+              "name": "Karka Queen",
+              "offset": 720,
+              "duration": 5,
+              "color": [
+                0.3,
+                0.8,
+                0.7,
+                1
+              ],
+              "copy_text": "[&BNUGAAA=]"
+            },
+            {
+              "name": "Karka Queen",
+              "offset": 900,
+              "duration": 5,
+              "color": [
+                0.3,
+                0.8,
+                0.7,
+                1
+              ],
+              "copy_text": "[&BNUGAAA=]"
+            },
+            {
+              "name": "Karka Queen",
+              "offset": 1200,
+              "duration": 5,
+              "color": [
+                0.3,
+                0.8,
+                0.7,
+                1
+              ],
+              "copy_text": "[&BNUGAAA=]"
+            },
+            {
+              "name": "Karka Queen",
+              "offset": 1380,
+              "duration": 5,
+              "color": [
+                0.3,
+                0.8,
+                0.7,
+                1
+              ],
+              "copy_text": "[&BNUGAAA=]"
+            },
+            {
+              "name": "Tequatl",
+              "offset": 0,
+              "duration": 15,
+              "color": [
+                0.2,
+                0.5,
+                0.6,
+                1
+              ],
+              "copy_text": "[&BNABAAA=]"
+            },
+            {
+              "name": "Tequatl",
+              "offset": 240,
+              "duration": 15,
+              "color": [
+                0.2,
+                0.5,
+                0.6,
+                1
+              ],
+              "copy_text": "[&BNABAAA=]"
+            },
+            {
+              "name": "Tequatl",
+              "offset": 510,
+              "duration": 15,
+              "color": [
+                0.2,
+                0.5,
+                0.6,
+                1
+              ],
+              "copy_text": "[&BNABAAA=]"
+            },
+            {
+              "name": "Tequatl",
+              "offset": 780,
+              "duration": 15,
+              "color": [
+                0.2,
+                0.5,
+                0.6,
+                1
+              ],
+              "copy_text": "[&BNABAAA=]"
+            },
+            {
+              "name": "Tequatl",
+              "offset": 960,
+              "duration": 15,
+              "color": [
+                0.2,
+                0.5,
+                0.6,
+                1
+              ],
+              "copy_text": "[&BNABAAA=]"
+            },
+            {
+              "name": "Tequatl",
+              "offset": 1260,
+              "duration": 15,
+              "color": [
+                0.2,
+                0.5,
+                0.6,
+                1
+              ],
+              "copy_text": "[&BNABAAA=]"
+            },
+            {
+              "name": "Triple Trouble",
+              "offset": 60,
+              "duration": 20,
+              "color": [
+                0.2,
+                0.7,
+                0.3,
+                1
+              ],
+              "copy_text": "[&BKoBAAA=]"
+            },
+            {
+              "name": "Triple Trouble",
+              "offset": 300,
+              "duration": 20,
+              "color": [
+                0.2,
+                0.7,
+                0.3,
+                1
+              ],
+              "copy_text": "[&BKoBAAA=]"
+            },
+            {
+              "name": "Triple Trouble",
+              "offset": 570,
+              "duration": 20,
+              "color": [
+                0.2,
+                0.7,
+                0.3,
+                1
+              ],
+              "copy_text": "[&BKoBAAA=]"
+            },
+            {
+              "name": "Triple Trouble",
+              "offset": 840,
+              "duration": 20,
+              "color": [
+                0.2,
+                0.7,
+                0.3,
+                1
+              ],
+              "copy_text": "[&BKoBAAA=]"
+            },
+            {
+              "name": "Triple Trouble",
+              "offset": 1020,
+              "duration": 20,
+              "color": [
+                0.2,
+                0.7,
+                0.3,
+                1
+              ],
+              "copy_text": "[&BKoBAAA=]"
+            },
+            {
+              "name": "Triple Trouble",
+              "offset": 1320,
+              "duration": 20,
+              "color": [
+                0.2,
+                0.7,
+                0.3,
+                1
+              ],
+              "copy_text": "[&BKoBAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Ley-Line Anomaly",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Gendarran",
+              "offset": 80,
+              "interval": 1440,
+              "duration": 20,
+              "color": [
+                0.8,
+                0.2,
+                0.8,
+                1
+              ],
+              "copy_text": "[&BOQAAAA=]"
+            },
+            {
+              "name": "Timberline",
+              "offset": 320,
+              "interval": 1440,
+              "duration": 20,
+              "color": [
+                0.8,
+                0.2,
+                0.8,
+                1
+              ],
+              "copy_text": "[&BEwCAAA=]"
+            },
+            {
+              "name": "Iron Marches",
+              "offset": 560,
+              "interval": 1440,
+              "duration": 20,
+              "color": [
+                0.8,
+                0.2,
+                0.8,
+                1
+              ],
+              "copy_text": "[&BOcBAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Awakened",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Awakened Invasion",
+              "offset": 30,
+              "interval": 60,
+              "duration": 15,
+              "color": [
+                0.6,
+                0.4,
+                0.9,
+                1
+              ],
+              "copy_text": "/wiki Defeat the invading Awakened"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Fractal Incursion",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Snowden Drifts",
+              "offset": 0,
+              "interval": 240,
+              "duration": 15,
+              "color": [
+                0.9,
+                0.4,
+                0.9,
+                1
+              ],
+              "copy_text": "[&BLQAAAA=]"
+            },
+            {
+              "name": "Kessex Hills",
+              "offset": 60,
+              "interval": 240,
+              "duration": 15,
+              "color": [
+                0.9,
+                0.4,
+                0.9,
+                1
+              ],
+              "copy_text": "[&BBIAAAA=]"
+            },
+            {
+              "name": "Diessa Plateau",
+              "offset": 120,
+              "interval": 240,
+              "duration": 15,
+              "color": [
+                0.9,
+                0.4,
+                0.9,
+                1
+              ],
+              "copy_text": "[&BN0AAAA=]"
+            },
+            {
+              "name": "Brisban Wildlands",
+              "offset": 180,
+              "interval": 240,
+              "duration": 15,
+              "color": [
+                0.9,
+                0.4,
+                0.9,
+                1
+              ],
+              "copy_text": "[&BHUAAAA=]"
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
+    {
+      "name": "Living World Season 1",
+      "tracks": [
+        {
+          "name": "Scarlet's Invasion",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Invasion",
+              "offset": 0,
+              "interval": 120,
+              "duration": 15,
+              "color": [
+                0.9,
+                0.2,
+                0.5,
+                1
+              ],
+              "copy_text": "[&BOQAAAA=]"
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
+    {
+      "name": "Living World Season 2",
+      "tracks": [
+        {
+          "name": "Dry Top",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Crash Site",
+              "offset": 0,
+              "interval": 60,
+              "duration": 40,
+              "color": [
+                0.8,
+                0.6,
+                0.3,
+                1
+              ],
+              "copy_text": "[&BIAHAAA=]"
+            },
+            {
+              "name": "Sandstorm",
+              "offset": 40,
+              "interval": 60,
+              "duration": 20,
+              "color": [
+                0.9,
+                0.5,
+                0.1,
+                1
+              ],
+              "copy_text": "[&BIAHAAA=]"
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
+    {
+      "name": "Heart of Thorns",
+      "tracks": [
+        {
+          "name": "Verdant Brink",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Night and the Enemy",
+              "offset": 45,
+              "interval": 120,
+              "duration": 24,
+              "color": [
+                0.9,
+                0.5,
+                0.2,
+                1
+              ],
+              "copy_text": "[&BN4HAAA=]"
+            },
+            {
+              "name": "Night Bosses",
+              "offset": 69,
+              "interval": 120,
+              "duration": 21,
+              "color": [
+                0.8,
+                0.1,
+                0.1,
+                1
+              ],
+              "copy_text": "[&BAgIAAA=]"
+            },
+            {
+              "name": "Securing Verdant Brink",
+              "offset": 90,
+              "interval": 120,
+              "duration": 75,
+              "color": [
+                0.2,
+                0.7,
+                0.3,
+                1
+              ],
+              "copy_text": "[&BN4HAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Auric Basin",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Battle in Tarir",
+              "offset": 0,
+              "interval": 120,
+              "duration": 20,
+              "color": [
+                1,
+                0.8,
+                0,
+                1
+              ],
+              "copy_text": "[&BGwIAAA=], [&BN0HAAA=], [&BAYIAAA=], [&BAIIAAA=]"
+            },
+            {
+              "name": "Defending Tarir",
+              "offset": 30,
+              "interval": 120,
+              "duration": 75,
+              "color": [
+                0.4,
+                0.7,
+                0.9,
+                1
+              ],
+              "copy_text": "[&BGwIAAA=]"
+            },
+            {
+              "name": "Trial by Fire",
+              "offset": 105,
+              "interval": 120,
+              "duration": 15,
+              "color": [
+                1,
+                0.4,
+                0.1,
+                1
+              ],
+              "copy_text": "[&BGwIAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Tangled Depths",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "King of the Jungle",
+              "offset": 90,
+              "interval": 120,
+              "duration": 20,
+              "color": [
+                0.7,
+                0.3,
+                0.9,
+                1
+              ],
+              "copy_text": "[&BPUHAAA=]"
+            },
+            {
+              "name": "Outposts",
+              "offset": 110,
+              "interval": 120,
+              "duration": 100,
+              "color": [
+                0.6,
+                0.4,
+                0.2,
+                1
+              ],
+              "copy_text": "[&BMwHAAA=], [&BAwIAAA=], [&BAMIAAA=] or [&BAAIAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Dragon's Stand",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Advancing on the Blighting Towers",
+              "offset": 30,
+              "interval": 120,
+              "duration": 120,
+              "color": [
+                0.5,
+                0.2,
+                0.7,
+                1
+              ],
+              "copy_text": "[&BBAIAAA=]"
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
+    {
+      "name": "Living World Season 3",
+      "tracks": [
+        {
+          "name": "Lake Doric",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Saidra's Haven",
+              "offset": 0,
+              "interval": 120,
+              "duration": 45,
+              "color": [
+                0.8,
+                0.1,
+                0.2,
+                1
+              ],
+              "copy_text": "[&BK0JAAA=]"
+            },
+            {
+              "name": "New Loamhurst",
+              "offset": 45,
+              "interval": 120,
+              "duration": 45,
+              "color": [
+                0.9,
+                0.2,
+                0.3,
+                1
+              ],
+              "copy_text": "[&BLQJAAA=]"
+            },
+            {
+              "name": "Noran's Homestead",
+              "offset": 90,
+              "interval": 120,
+              "duration": 30,
+              "color": [
+                0.7,
+                0.1,
+                0.1,
+                1
+              ],
+              "copy_text": "[&BK8JAAA=]"
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
+    {
+      "name": "Path of Fire",
+      "tracks": [
+        {
+          "name": "Crystal Oasis",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Casino Blitz",
+              "offset": 65,
+              "interval": 120,
+              "duration": 15,
+              "color": [
+                0.2,
+                0.7,
+                0.9,
+                1
+              ],
+              "copy_text": "[&BLsKAAA=]"
+            },
+            {
+              "name": "Choya Piñata",
+              "offset": 81,
+              "interval": 120,
+              "duration": 2,
+              "color": [
+                1,
+                0.8,
+                0,
+                1
+              ],
+              "copy_text": "[&BLsKAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Desert Highlands",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Buried Treasure",
+              "offset": 0,
+              "interval": 120,
+              "duration": 20,
+              "color": [
+                0.9,
+                0.7,
+                0.4,
+                1
+              ],
+              "copy_text": "[&BGsKAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Elon Riverlands",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Path to Ascension",
+              "offset": 30,
+              "interval": 120,
+              "duration": 25,
+              "color": [
+                0.4,
+                0.8,
+                0.5,
+                1
+              ],
+              "copy_text": "[&BFMKAAA=]"
+            },
+            {
+              "name": "Doppelganger",
+              "offset": 55,
+              "interval": 120,
+              "duration": 10,
+              "color": [
+                0.7,
+                0.4,
+                0.9,
+                1
+              ],
+              "copy_text": "[&BFMKAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "The Desolation",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Maws of Torment",
+              "offset": 0,
+              "interval": 120,
+              "duration": 20,
+              "color": [
+                0.8,
+                0.8,
+                0.2,
+                1
+              ],
+              "copy_text": "[&BKMKAAA=]"
+            },
+            {
+              "name": "Junundu Rising",
+              "offset": 30,
+              "interval": 60,
+              "duration": 20,
+              "color": [
+                0.7,
+                0.5,
+                0.2,
+                1
+              ],
+              "copy_text": "[&BMEKAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Domain of Vabbi",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Forged with Fire",
+              "offset": 0,
+              "interval": 60,
+              "duration": 20,
+              "color": [
+                1,
+                0.4,
+                0,
+                1
+              ],
+              "copy_text": "[&BO0KAAA=]"
+            },
+            {
+              "name": "Serpent's Ire",
+              "offset": 90,
+              "interval": 120,
+              "duration": 30,
+              "color": [
+                0.9,
+                0.6,
+                0.2,
+                1
+              ],
+              "copy_text": "[&BHQKAAA=]"
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
+    {
+      "name": "Living World Season 4",
+      "tracks": [
+        {
+          "name": "Domain of Istan",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Palawadan",
+              "offset": 45,
+              "interval": 120,
+              "duration": 30,
+              "color": [
+                0.8,
+                0.5,
+                0.2,
+                1
+              ],
+              "copy_text": "[&BAkLAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Jahai Bluffs",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Dangerous Prey",
+              "offset": 0,
+              "interval": 120,
+              "duration": 10,
+              "color": [
+                0.7,
+                0.7,
+                0.5,
+                1
+              ],
+              "copy_text": "[&BIMLAAA=]"
+            },
+            {
+              "name": "Death-Branded Shatterer",
+              "offset": 15,
+              "interval": 120,
+              "duration": 15,
+              "color": [
+                0.8,
+                0.5,
+                1,
+                1
+              ],
+              "copy_text": "[&BJMLAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Thunderhead Peaks",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Thunderhead Keep",
+              "offset": 45,
+              "interval": 120,
+              "duration": 20,
+              "color": [
+                0.6,
+                0.6,
+                0.7,
+                1
+              ],
+              "copy_text": "[&BLsLAAA=]"
+            },
+            {
+              "name": "The Oil Floes",
+              "offset": 105,
+              "interval": 120,
+              "duration": 20,
+              "color": [
+                0.2,
+                0.2,
+                0.2,
+                1
+              ],
+              "copy_text": "[&BKYLAAA=]"
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
+    {
+      "name": "Icebrood Saga",
+      "tracks": [
+        {
+          "name": "Grothmar Valley",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Ooze Pit Trials",
+              "offset": 5,
+              "interval": 120,
+              "duration": 15,
+              "color": [
+                0.4,
+                0.8,
+                0.3,
+                1
+              ],
+              "copy_text": "[&BPgLAAA=]"
+            },
+            {
+              "name": "Concert for the Ages",
+              "offset": 40,
+              "interval": 120,
+              "duration": 15,
+              "color": [
+                1,
+                0.3,
+                0.1,
+                1
+              ],
+              "copy_text": "[&BPgLAAA=]"
+            },
+            {
+              "name": "Ceremony of the Sacred Flame",
+              "offset": 70,
+              "interval": 120,
+              "duration": 15,
+              "color": [
+                1,
+                0.6,
+                0.1,
+                1
+              ],
+              "copy_text": "[&BA4MAAA=]"
+            },
+            {
+              "name": "Haunting of Doomlore Shrine",
+              "offset": 98,
+              "interval": 120,
+              "duration": 17,
+              "color": [
+                0.3,
+                0.8,
+                0.7,
+                1
+              ],
+              "copy_text": "[&BA4MAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Bjora Marches",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Champion of the Ice Dragon",
+              "offset": 5,
+              "interval": 120,
+              "duration": 35,
+              "color": [
+                0.4,
+                0.6,
+                1,
+                1
+              ],
+              "copy_text": "[&BDkMAAA=]"
+            },
+            {
+              "name": "Storms of Winter",
+              "offset": 45,
+              "interval": 120,
+              "duration": 35,
+              "color": [
+                0.7,
+                0.8,
+                1,
+                1
+              ],
+              "copy_text": "[&BCcMAAA=]"
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
+    {
+      "name": "End of Dragons",
+      "tracks": [
+        {
+          "name": "Seitung Province",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Aetherblade Assault",
+              "offset": 30,
+              "interval": 120,
+              "duration": 30,
+              "color": [
+                0.3,
+                0.7,
+                0.7,
+                1
+              ],
+              "copy_text": "[&BGUNAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "New Kaineng City",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Kaineng Blackout",
+              "offset": 60,
+              "interval": 120,
+              "duration": 40,
+              "color": [
+                0.9,
+                0.2,
+                0.7,
+                1
+              ],
+              "copy_text": "[&BBkNAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "The Echovald Wilds",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Aspenwood",
+              "offset": 40,
+              "interval": 120,
+              "duration": 20,
+              "color": [
+                0.3,
+                0.5,
+                0.4,
+                1
+              ],
+              "copy_text": "[&BPkMAAA=]"
+            },
+            {
+              "name": "The Gang War of Echovald",
+              "offset": 90,
+              "interval": 120,
+              "duration": 30,
+              "color": [
+                0.1,
+                0.6,
+                0.5,
+                1
+              ],
+              "copy_text": "[&BMwMAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Dragon's End",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "The Battle for the Jade Sea",
+              "offset": 0,
+              "interval": 120,
+              "duration": 60,
+              "color": [
+                0.2,
+                0.8,
+                0.6,
+                1
+              ],
+              "copy_text": "[&BKIMAAA=]"
+            },
+            {
+              "name": "Jade Maw",
+              "offset": 65,
+              "interval": 120,
+              "duration": 8,
+              "color": [
+                0.1,
+                0.5,
+                0.3,
+                1
+              ],
+              "copy_text": "[&BKIMAAA=]"
+            },
+            {
+              "name": "Jade Maw",
+              "offset": 105,
+              "interval": 120,
+              "duration": 8,
+              "color": [
+                0.1,
+                0.5,
+                0.3,
+                1
+              ],
+              "copy_text": "[&BKIMAAA=]"
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
+    {
+      "name": "Secrets of the Obscure",
+      "tracks": [
+        {
+          "name": "Skywatch Archipelago",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Unlocking the Wizard's Tower",
+              "offset": 0,
+              "interval": 120,
+              "duration": 25,
+              "color": [
+                0.7,
+                0.7,
+                1,
+                1
+              ],
+              "copy_text": "[&BL4NAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Amnytas",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "The Defense of Amnytas",
+              "offset": 60,
+              "interval": 120,
+              "duration": 30,
+              "color": [
+                1,
+                0.8,
+                0.5,
+                1
+              ],
+              "copy_text": "[&BDQOAAA=]"
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
+    {
+      "name": "Janthir Wilds",
+      "tracks": [
+        {
+          "name": "Janthir Syntri",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Of Mists and Monsters",
+              "offset": 90,
+              "interval": 120,
+              "duration": 25,
+              "color": [
+                0.5,
+                0.7,
+                0.7,
+                1
+              ],
+              "copy_text": "[&BCoPAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Bava Nisos",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "A Titanic Voyage",
+              "offset": 20,
+              "interval": 120,
+              "duration": 30,
+              "color": [
+                0.2,
+                0.4,
+                0.8,
+                1
+              ],
+              "copy_text": "[&BGEPAAA=]"
+            }
+          ],
+          "events": []
+        }
+      ]
+    }
+  ]
+}
