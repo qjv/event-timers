@@ -450,19 +450,33 @@ fn handle_track_tooltip(
             let event_end_x = event_start_x + event_width;
 
             if mouse_x >= event_start_x && mouse_x <= event_end_x {
-                let time_until_next = if time_offset > 0 {
-                    time_offset
+                // Calculate time info for THIS specific occurrence bar
+                let this_occurrence_start = current_time + time_offset;
+                let this_occurrence_end = this_occurrence_start + event.duration;
+                
+                // Determine display text based on timing
+                let (timing_text, is_active_now) = if current_time >= this_occurrence_start && current_time < this_occurrence_end {
+                    // Currently active
+                    let seconds_remaining = this_occurrence_end - current_time;
+                    let minutes_remaining = (seconds_remaining / 60) as i32;
+                    (format!("Active now ({}m remaining)", minutes_remaining), true)
+                } else if this_occurrence_start > current_time {
+                    // Future occurrence
+                    let seconds_until = this_occurrence_start - current_time;
+                    let minutes_until = (seconds_until / 60) as i32;
+                    (format!("Starts: {} (in {}m)", format_time_only(this_occurrence_start), minutes_until), false)
                 } else {
-                    time_offset + event.cycle_duration
+                    // Past occurrence
+                    (format!("Ended: {}", format_time_only(this_occurrence_end)), false)
                 };
-                let next_occurrence_time = current_time + time_until_next;
 
                 ui.tooltip(|| {
                     ui.text(format!("Track: {}", track.name));
                     ui.text(format!("Event: {}", event.name));
                     ui.separator();
-                    ui.text(format!("Next: {}", format_time_only(next_occurrence_time)));
+                    ui.text(&timing_text);
                     if !event.copy_text.is_empty() {
+                        ui.separator();
                         ui.text(format!("Click to copy: {}", event.copy_text));
                     }
                 });
