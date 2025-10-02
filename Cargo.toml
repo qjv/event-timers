@@ -1,6 +1,6 @@
 [package]
 name = "event_timers"
-version = "1.0.3"
+version = "1.0.4"
 edition = "2021"
 authors = ["hvaren"]
 description = "Event timers port to Nexus, based on the wiki page of same name."
@@ -12,7 +12,8 @@ serde_json = "1.0"
 once_cell = "1.19"
 parking_lot = "0.12"
 chrono = "0.4"
-reqwest = { version = "0.11", features = ["blocking"] }
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1", features = ["rt", "macros"] }
 
 [lib]
 crate-type = ["cdylib"]

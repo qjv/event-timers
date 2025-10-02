@@ -2,7 +2,7 @@ use crate::config::{get_track_visual_config, RUNTIME_CONFIG};
 use crate::json_loader::EventTrack;
 use crate::time_utils::{format_time_only, get_current_unix_time};
 use crate::ui::time_ruler::render_time_ruler;
-use nexus::imgui::{ChildWindow, Condition, MenuItem, MouseButton, StyleVar, Ui, Window, WindowFlags};
+use nexus::imgui::{Condition, MenuItem, MouseButton, StyleVar, Ui, Window, WindowFlags};
 use std::collections::HashSet;
 
 pub fn render_main_window(ui: &Ui) {
@@ -71,8 +71,6 @@ pub fn render_main_window(ui: &Ui) {
             });
             
             // Create a child window for proper scrolling and clipping
-            let content_width = ui.content_region_avail()[0];
-            let content_height = ui.content_region_avail()[1];
             
             if config.show_time_ruler {
                 render_time_ruler(ui, current_time, view_range, time_position);
@@ -460,7 +458,7 @@ fn handle_track_tooltip(
                 let this_occurrence_end = this_occurrence_start + event.duration;
                 
                 // Determine display text based on timing
-                let (timing_text, is_active_now) = if current_time >= this_occurrence_start && current_time < this_occurrence_end {
+                let (timing_text, _is_active_now) = if current_time >= this_occurrence_start && current_time < this_occurrence_end {
                     // Currently active
                     let seconds_remaining = this_occurrence_end - current_time;
                     let minutes_remaining = (seconds_remaining / 60) as i32;

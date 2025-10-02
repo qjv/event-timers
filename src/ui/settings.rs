@@ -13,80 +13,97 @@ pub fn check_for_event_tracks_update() {
     use std::thread;
     
     thread::spawn(|| {
-        nexus::log::log(
-            nexus::log::LogLevel::Info,
-            "Event Timers",
-            "Checking for event_tracks.json updates from GitHub..."
-        );
+        // CRITICAL: Use a separate thread-local runtime to avoid conflicts
+        let runtime_result = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build();
         
-        // Fetch from GitHub using reqwest
-        match reqwest::blocking::get(GITHUB_EVENT_TRACKS_URL) {
-            Ok(response) => {
-                match response.text() {
-                    Ok(github_content) => {
-                        // Read local file
-                        let local_path = nexus::paths::get_addon_dir("event_timers")
-                            .map(|p| p.join("event_tracks.json"));
-                        
-                        if let Some(path) = local_path {
-                            let needs_update = if path.exists() {
-                                match std::fs::read_to_string(&path) {
-                                    Ok(local_content) => local_content != github_content,
-                                    Err(_) => true,
-                                }
-                            } else {
-                                true
-                            };
-                            
-                            if needs_update {
-                                // Backup old file
-                                if path.exists() {
-                                    let backup_path = path.with_extension("json.backup");
-                                    let _ = std::fs::copy(&path, backup_path);
-                                }
-                                
-                                match std::fs::write(&path, github_content) {
-                                    Ok(_) => {
-                                        nexus::log::log(
-                                            nexus::log::LogLevel::Info,
-                                            "Event Timers",
-                                            "event_tracks.json updated! Reload addon (Ctrl+Shift+L) to apply."
-                                        );
-                                    }
-                                    Err(e) => {
-                                        nexus::log::log(
-                                            nexus::log::LogLevel::Critical,
-                                            "Event Timers",
-                                            &format!("Failed to write file: {}", e)
-                                        );
-                                    }
-                                }
-                            } else {
-                                nexus::log::log(
-                                    nexus::log::LogLevel::Info,
-                                    "Event Timers",
-                                    "event_tracks.json is already up to date!"
-                                );
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        nexus::log::log(
-                            nexus::log::LogLevel::Critical,
-                            "Event Timers",
-                            &format!("Failed to read response: {}", e)
-                        );
-                    }
-                }
-            }
+        let runtime = match runtime_result {
+            Ok(rt) => rt,
             Err(e) => {
                 nexus::log::log(
                     nexus::log::LogLevel::Critical,
                     "Event Timers",
-                    &format!("Failed to fetch from GitHub: {}", e)
+                    &format!("Failed to create Tokio runtime: {}", e)
                 );
+                return;
             }
-        }
+        };
+        
+        runtime.block_on(async {
+            nexus::log::log(
+                nexus::log::LogLevel::Info,
+                "Event Timers",
+                "Checking for event_tracks.json updates from GitHub..."
+            );
+            
+            // Use async reqwest instead of blocking
+            match reqwest::get(GITHUB_EVENT_TRACKS_URL).await {
+                Ok(response) => {
+                    match response.text().await {
+                        Ok(github_content) => {
+                            let local_path = nexus::paths::get_addon_dir("event_timers")
+                                .map(|p| p.join("event_tracks.json"));
+                            
+                            if let Some(path) = local_path {
+                                let needs_update = if path.exists() {
+                                    match std::fs::read_to_string(&path) {
+                                        Ok(local_content) => local_content != github_content,
+                                        Err(_) => true,
+                                    }
+                                } else {
+                                    true
+                                };
+                                
+                                if needs_update {
+                                    if path.exists() {
+                                        let backup_path = path.with_extension("json.backup");
+                                        let _ = std::fs::copy(&path, backup_path);
+                                    }
+                                    
+                                    match std::fs::write(&path, github_content) {
+                                        Ok(_) => {
+                                            nexus::log::log(
+                                                nexus::log::LogLevel::Info,
+                                                "Event Timers",
+                                                "event_tracks.json updated! Reload addon (Ctrl+Shift+L) to apply."
+                                            );
+                                        }
+                                        Err(e) => {
+                                            nexus::log::log(
+                                                nexus::log::LogLevel::Critical,
+                                                "Event Timers",
+                                                &format!("Failed to write file: {}", e)
+                                            );
+                                        }
+                                    }
+                                } else {
+                                    nexus::log::log(
+                                        nexus::log::LogLevel::Info,
+                                        "Event Timers",
+                                        "event_tracks.json is already up to date!"
+                                    );
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            nexus::log::log(
+                                nexus::log::LogLevel::Critical,
+                                "Event Timers",
+                                &format!("Failed to read response: {}", e)
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    nexus::log::log(
+                        nexus::log::LogLevel::Critical,
+                        "Event Timers",
+                        &format!("Failed to fetch from GitHub: {}", e)
+                    );
+                }
+            }
+        });
     });
 }
 
@@ -362,7 +379,7 @@ pub fn render_settings(ui: &Ui) {
             }
             
             // Handle track deletion with confirmation
-            if let Some(delete_index) = track_to_delete {
+            if let Some(_delete_index) = track_to_delete {
                 ui.open_popup(&format!("Delete Track##confirm_{}", category));
             }
             

@@ -133,6 +133,7 @@ struct JsonCategory {
     tracks: Vec<JsonTrack>,
 }
 
+#[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct JsonRoot {
     version: String,
