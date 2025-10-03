@@ -66,8 +66,11 @@ pub fn check_for_event_tracks_update() {
                                             nexus::log::log(
                                                 nexus::log::LogLevel::Info,
                                                 "Event Timers",
-                                                "event_tracks.json updated! Reload addon (Ctrl+Shift+L) to apply."
+                                                "event_tracks.json updated! Reloading..."
                                             );
+                                            
+                                            // Reload config immediately
+                                            crate::config::apply_user_overrides();
                                         }
                                         Err(e) => {
                                             nexus::log::log(

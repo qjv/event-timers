@@ -70,6 +70,58 @@ pub fn render_main_window(ui: &Ui) {
                 }
             });
             
+            // Custom close button in top-right corner
+            let window_pos = ui.window_pos();
+            let window_size = ui.window_size();
+            let button_size = 20.0;
+            let padding = 4.0;
+            
+            let button_pos = [
+                window_pos[0] + window_size[0] - button_size - padding,
+                window_pos[1] + padding
+            ];
+            
+            let mouse_pos = ui.io().mouse_pos;
+            let is_hovered = mouse_pos[0] >= button_pos[0] && mouse_pos[0] <= button_pos[0] + button_size
+                && mouse_pos[1] >= button_pos[1] && mouse_pos[1] <= button_pos[1] + button_size;
+            
+            let button_color = if is_hovered { [0.8, 0.2, 0.2, 1.0] } else { [0.5, 0.5, 0.5, 0.5] };
+            
+            let draw_list = ui.get_foreground_draw_list();
+            
+            // Draw button background
+            draw_list.add_rect(
+                button_pos,
+                [button_pos[0] + button_size, button_pos[1] + button_size],
+                button_color
+            )
+            .filled(true)
+            .rounding(3.0)
+            .build();
+            
+            // Draw X symbol
+            let x_padding = 5.0;
+            draw_list.add_line(
+                [button_pos[0] + x_padding, button_pos[1] + x_padding],
+                [button_pos[0] + button_size - x_padding, button_pos[1] + button_size - x_padding],
+                [1.0, 1.0, 1.0, 1.0]
+            )
+            .thickness(2.0)
+            .build();
+            
+            draw_list.add_line(
+                [button_pos[0] + button_size - x_padding, button_pos[1] + x_padding],
+                [button_pos[0] + x_padding, button_pos[1] + button_size - x_padding],
+                [1.0, 1.0, 1.0, 1.0]
+            )
+            .thickness(2.0)
+            .build();
+            
+            // Handle click
+            if is_hovered && ui.is_mouse_clicked(MouseButton::Left) {
+                config.show_main_window = false;
+            }
+            
             // Create a child window for proper scrolling and clipping
             
             if config.show_time_ruler {

@@ -52,6 +52,22 @@ pub fn render_time_ruler(ui: &Ui, current_time: i64, view_range: f32, time_posit
     )
     .thickness(2.0)
     .build();
+
+    // Draw current time text at horizontal center of ruler
+    let local_time = chrono::Local::now().format("%H:%M:%S").to_string();
+    let (tyria_h, tyria_m) = calculate_tyria_time(current_time);
+    let tyria_time = format!("{:02}:{:02}", tyria_h, tyria_m);
+
+    let time_text = format!("Local: {} - Tyria: {}", local_time, tyria_time);
+    let text_size = ui.calc_text_size(&time_text);
+
+    // Center horizontally in the ruler
+    let text_pos = [
+        cursor_pos[0] + (available_width - text_size[0]) / 2.0,
+        cursor_pos[1]
+    ];
+
+    draw_list.add_text(text_pos, [1.0, 1.0, 1.0, 1.0], &time_text);
     
     ui.dummy([available_width, ruler_height]);
     
