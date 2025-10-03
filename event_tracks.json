@@ -269,7 +269,7 @@
             },
             {
               "name": "Svanir Shaman Chief",
-              "offset": 15,
+              "offset": 75,
               "interval": 120,
               "duration": 15,
               "color": [
@@ -321,7 +321,7 @@
             },
             {
               "name": "Great Jungle Wurm",
-              "offset": 75,
+              "offset": 15,
               "interval": 120,
               "duration": 15,
               "color": [
