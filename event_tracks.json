@@ -623,7 +623,7 @@
             {
               "name": "Gendarran",
               "offset": 80,
-              "interval": 1440,
+              "interval": 360,
               "duration": 20,
               "color": [
                 0.8,
@@ -636,7 +636,7 @@
             {
               "name": "Timberline",
               "offset": 320,
-              "interval": 1440,
+              "interval": 360,
               "duration": 20,
               "color": [
                 0.8,
@@ -649,7 +649,7 @@
             {
               "name": "Iron Marches",
               "offset": 560,
-              "interval": 1440,
+              "interval": 360,
               "duration": 20,
               "color": [
                 0.8,
