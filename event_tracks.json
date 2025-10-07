@@ -1,7 +1,35 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "hash": "",
   "categories": [
+    {
+      "name": "Seasonal Events",
+      "tracks": [
+        {
+          "name": "Halloween",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Mad King Says",
+              "offset": 60,
+              "interval": 120,
+              "duration": 10,
+              "color": [
+                0.890,
+                0.259,
+                0.008,
+                1
+              ],
+              "copy_text": "[&BBAEAAA=]"
+            }
+          ],
+          "events": []
+        },
+      ]
+    },
     {
       "name": "Time Cycles",
       "tracks": [
