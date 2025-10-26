@@ -1,7 +1,35 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.8",
   "hash": "",
   "categories": [
+      {
+      "name": "Seasonal Events",
+      "tracks": [
+        {
+          "name": "Halloween",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Mad King Says",
+              "offset": 60,
+              "interval": 120,
+              "duration": 10,
+              "color": [
+                0.890,
+                0.259,
+                0.008,
+                1
+              ],
+              "copy_text": "[&BBAEAAA=]"
+            }
+          ],
+          "events": []
+        }
+      ]
+    },
     {
       "name": "Time Cycles",
       "tracks": [
@@ -621,9 +649,9 @@
           "height": 20,
           "schedules": [
             {
-              "name": "Gendarran",
+              "name": "Gendarran Fields",
               "offset": 80,
-              "interval": 1440,
+              "interval": 360,
               "duration": 20,
               "color": [
                 0.8,
@@ -634,9 +662,9 @@
               "copy_text": "[&BOQAAAA=]"
             },
             {
-              "name": "Timberline",
-              "offset": 320,
-              "interval": 1440,
+              "name": "Timberline Falls",
+              "offset": 200,
+              "interval": 360,
               "duration": 20,
               "color": [
                 0.8,
@@ -648,8 +676,8 @@
             },
             {
               "name": "Iron Marches",
-              "offset": 560,
-              "interval": 1440,
+              "offset": 320,
+              "interval": 360,
               "duration": 20,
               "color": [
                 0.8,
