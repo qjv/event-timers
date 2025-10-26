@@ -4,9 +4,37 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fs, path::PathBuf};
 
-use crate::json_loader::{load_tracks_from_json, EventTrack, EventColor, TimelineEvent};
+use crate::json_loader::{load_tracks_from_json, EventTrack};
 
 const USER_CONFIG_FILENAME: &str = "user_config.json";
+
+// === Alignment Options ===
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+pub enum TextAlignment {
+    Left,
+    Center,
+    Right,
+}
+
+impl Default for TextAlignment {
+    fn default() -> Self {
+        Self::Center
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+pub enum LabelColumnPosition {
+    None,
+    Left,
+    Right,
+}
+
+impl Default for LabelColumnPosition {
+    fn default() -> Self {
+        Self::None
+    }
+}
 
 // === Visual Configuration ===
 
@@ -33,32 +61,13 @@ impl Default for TrackVisualConfig {
 // === Track Override ===
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
-pub struct EventOverride {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub enabled: Option<bool>,           // Replaces disabled_events
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub color: Option<[f32; 4]>,         // Custom color
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub start_offset: Option<i64>,       // Custom timing
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub duration: Option<i64>,           // Custom duration
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct TrackOverride {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub visible: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub height: Option<f32>,
-    
-    // NEW: Per-event overrides (keyed by event name)
-    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
-    pub event_overrides: HashMap<String, EventOverride>,
-    
-    // DEPRECATED but kept for migration
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub disabled_events: Vec<String>,
-    
     #[serde(skip_serializing_if = "Option::is_none")]
     pub visual: Option<TrackVisualConfig>,
 }
@@ -111,12 +120,37 @@ pub struct UserConfig {
     pub event_border_color: [f32; 4],
     #[serde(default = "default_border_thickness")]
     pub event_border_thickness: f32,
+    #[serde(default)]
+    pub category_header_alignment: TextAlignment,
+    #[serde(default)]
+    pub category_header_padding: f32,
+    #[serde(default)]
+    pub label_column_position: LabelColumnPosition,
+    #[serde(default = "default_label_column_width")]
+    pub label_column_width: f32,
+    #[serde(default)]
+    pub label_column_show_category: bool,
+    #[serde(default = "default_true")]
+    pub label_column_show_track: bool,
+    #[serde(default = "default_label_text_size")]
+    pub label_column_text_size: f32,
+    #[serde(default)]
+    pub label_column_bg_color: [f32; 4],
+    #[serde(default)]
+    pub label_column_text_color: [f32; 4],
+    #[serde(default = "default_label_category_color")]
+    pub label_column_category_color: [f32; 4],
+    #[serde(default = "default_true")]
+    pub close_on_escape: bool,
 }
 
 fn default_global_track_bg() -> [f32; 4] { [0.2, 0.2, 0.2, 0.2] } // #33333333
 fn default_border_color() -> [f32; 4] { [0.0, 0.0, 0.0, 1.0] } // #000000FF
 fn default_border_thickness() -> f32 { 1.0 }
 fn default_height() -> f32 { 40.0 }
+fn default_label_column_width() -> f32 { 150.0 }
+fn default_label_text_size() -> f32 { 1.0 }
+fn default_label_category_color() -> [f32; 4] { [0.8, 0.8, 0.2, 1.0] } // Yellow like default
 
 fn default_true() -> bool { true }
 fn default_timeline_width() -> f32 { 800.0 }
@@ -131,7 +165,7 @@ impl Default for UserConfig {
             track_overrides: HashMap::new(),
             custom_tracks: Vec::new(),
             category_visibility: HashMap::new(),
-            show_main_window: true,
+            show_main_window: false,
             is_window_locked: false,
             hide_background: false,
             show_time_ruler: true,
@@ -150,6 +184,17 @@ impl Default for UserConfig {
             draw_event_borders: true,
             event_border_color: [0.0, 0.0, 0.0, 1.0],
             event_border_thickness: 1.0,
+            category_header_alignment: TextAlignment::Center,
+            category_header_padding: 0.0,
+            label_column_position: LabelColumnPosition::None,
+            label_column_width: 150.0,
+            label_column_show_category: false,
+            label_column_show_track: true,
+            label_column_text_size: 1.0,
+            label_column_bg_color: [0.0, 0.0, 0.0, 0.0],
+            label_column_text_color: [1.0, 1.0, 1.0, 1.0],
+            label_column_category_color: [0.8, 0.8, 0.2, 1.0],
+            close_on_escape: false,
         }
     }
 }
@@ -180,6 +225,17 @@ pub struct RuntimeConfig {
     pub draw_event_borders: bool,
     pub event_border_color: [f32; 4],
     pub event_border_thickness: f32,
+    pub category_header_alignment: TextAlignment,
+    pub category_header_padding: f32,
+    pub label_column_position: LabelColumnPosition,
+    pub label_column_width: f32,
+    pub label_column_show_category: bool,
+    pub label_column_show_track: bool,
+    pub label_column_text_size: f32,
+    pub label_column_bg_color: [f32; 4],
+    pub label_column_text_color: [f32; 4],
+    pub label_column_category_color: [f32; 4],
+    pub close_on_escape: bool,
 }
 
 impl Default for RuntimeConfig {
@@ -208,6 +264,17 @@ impl Default for RuntimeConfig {
             draw_event_borders: true,
             event_border_color: [0.0, 0.0, 0.0, 1.0],
             event_border_thickness: 1.0,
+            category_header_alignment: TextAlignment::Center,
+            category_header_padding: 0.0,
+            label_column_position: LabelColumnPosition::None,
+            label_column_width: 150.0,
+            label_column_show_category: false,
+            label_column_show_track: true,
+            label_column_text_size: 1.0,
+            label_column_bg_color: [0.0, 0.0, 0.0, 0.0],
+            label_column_text_color: [1.0, 1.0, 1.0, 1.0],
+            label_column_category_color: [0.8, 0.8, 0.2, 1.0],
+            close_on_escape: true,
         }
     }
 }
@@ -231,7 +298,6 @@ pub fn apply_user_overrides() {
     
     for track in &mut runtime.tracks {
         if let Some(override_data) = user_cfg.track_overrides.get(&track.name) {
-            // Track-level overrides
             if let Some(visible) = override_data.visible {
                 track.visible = visible;
             }
@@ -239,21 +305,9 @@ pub fn apply_user_overrides() {
                 track.height = height;
             }
             
-            // Event-level overrides
             for event in &mut track.events {
-                if let Some(event_override) = override_data.event_overrides.get(&event.name) {
-                    if let Some(enabled) = event_override.enabled {
-                        event.enabled = enabled;
-                    }
-                    if let Some(color) = event_override.color {
-                        event.color = EventColor::from_array(color);
-                    }
-                    if let Some(offset) = event_override.start_offset {
-                        event.start_offset = offset;
-                    }
-                    if let Some(duration) = event_override.duration {
-                        event.duration = duration;
-                    }
+                if override_data.disabled_events.contains(&event.name) {
+                    event.enabled = false;
                 }
             }
         }
@@ -280,6 +334,17 @@ pub fn apply_user_overrides() {
     runtime.draw_event_borders = user_cfg.draw_event_borders;
     runtime.event_border_color = user_cfg.event_border_color;
     runtime.event_border_thickness = user_cfg.event_border_thickness;
+    runtime.category_header_alignment = user_cfg.category_header_alignment;
+    runtime.category_header_padding = user_cfg.category_header_padding;
+    runtime.label_column_position = user_cfg.label_column_position;
+    runtime.label_column_width = user_cfg.label_column_width;
+    runtime.label_column_show_category = user_cfg.label_column_show_category;
+    runtime.label_column_show_track = user_cfg.label_column_show_track;
+    runtime.label_column_text_size = user_cfg.label_column_text_size;
+    runtime.label_column_bg_color = user_cfg.label_column_bg_color;
+    runtime.label_column_text_color = user_cfg.label_column_text_color;
+    runtime.label_column_category_color = user_cfg.label_column_category_color;
+    runtime.close_on_escape = user_cfg.close_on_escape;
     runtime.category_visibility = user_cfg.category_visibility.clone();
 }
 
@@ -301,7 +366,6 @@ pub fn extract_user_overrides() {
             let mut override_data = TrackOverride::default();
             let mut has_changes = false;
             
-            // Track-level changes
             if track.visible != default_track.visible {
                 override_data.visible = Some(track.visible);
                 has_changes = true;
@@ -312,41 +376,10 @@ pub fn extract_user_overrides() {
                 has_changes = true;
             }
             
-            // Event-level changes
-            let default_event_map: HashMap<String, &TimelineEvent> = default_track.events
-                .iter()
-                .map(|e| (e.name.clone(), e))
-                .collect();
-            
             for event in &track.events {
-                if let Some(default_event) = default_event_map.get(&event.name) {
-                    let mut event_override = EventOverride::default();
-                    let mut event_has_changes = false;
-                    
-                    if event.enabled != default_event.enabled {
-                        event_override.enabled = Some(event.enabled);
-                        event_has_changes = true;
-                    }
-                    
-                    if event.color.to_array() != default_event.color.to_array() {
-                        event_override.color = Some(event.color.to_array());
-                        event_has_changes = true;
-                    }
-                    
-                    if event.start_offset != default_event.start_offset {
-                        event_override.start_offset = Some(event.start_offset);
-                        event_has_changes = true;
-                    }
-                    
-                    if event.duration != default_event.duration {
-                        event_override.duration = Some(event.duration);
-                        event_has_changes = true;
-                    }
-                    
-                    if event_has_changes {
-                        override_data.event_overrides.insert(event.name.clone(), event_override);
-                        has_changes = true;
-                    }
+                if !event.enabled {
+                    override_data.disabled_events.push(event.name.clone());
+                    has_changes = true;
                 }
             }
             
@@ -377,6 +410,17 @@ pub fn extract_user_overrides() {
     user_cfg.draw_event_borders = runtime.draw_event_borders;
     user_cfg.event_border_color = runtime.event_border_color;
     user_cfg.event_border_thickness = runtime.event_border_thickness;
+    user_cfg.category_header_alignment = runtime.category_header_alignment;
+    user_cfg.category_header_padding = runtime.category_header_padding;
+    user_cfg.label_column_position = runtime.label_column_position;
+    user_cfg.label_column_width = runtime.label_column_width;
+    user_cfg.label_column_show_category = runtime.label_column_show_category;
+    user_cfg.label_column_show_track = runtime.label_column_show_track;
+    user_cfg.label_column_text_size = runtime.label_column_text_size;
+    user_cfg.label_column_bg_color = runtime.label_column_bg_color;
+    user_cfg.label_column_text_color = runtime.label_column_text_color;
+    user_cfg.label_column_category_color = runtime.label_column_category_color;
+    user_cfg.close_on_escape = runtime.close_on_escape;
     user_cfg.category_visibility = runtime.category_visibility.clone();
 }
 
@@ -390,31 +434,9 @@ pub fn load_user_config() {
     if let Some(path) = get_user_config_path() {
         if path.exists() {
             if let Ok(json_str) = fs::read_to_string(&path) {
-                if let Ok(mut loaded) = serde_json::from_str::<UserConfig>(&json_str) {
-                    
-                    // MIGRATION: Convert disabled_events to event_overrides
-                    let mut needs_save = false;
-                    for track_override in loaded.track_overrides.values_mut() {
-                        if !track_override.disabled_events.is_empty() {
-                            for event_name in &track_override.disabled_events {
-                                track_override.event_overrides
-                                    .entry(event_name.clone())
-                                    .or_insert(EventOverride {
-                                        enabled: Some(false),
-                                        ..Default::default()
-                                    });
-                            }
-                            track_override.disabled_events.clear();
-                            needs_save = true;
-                        }
-                    }
-                    
+                if let Ok(loaded) = serde_json::from_str::<UserConfig>(&json_str) {
                     *USER_CONFIG.lock() = loaded;
                     apply_user_overrides();
-                    
-                    if needs_save {
-                        save_user_config(); // Auto-save migrated config
-                    }
                     return;
                 }
             }

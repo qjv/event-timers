@@ -132,6 +132,21 @@ pub fn render_settings(ui: &Ui) {
     ui.separator();
     
     ui.checkbox("Show Category Headers", &mut config.show_category_headers);
+
+    if config.show_category_headers {
+        ui.text("Category Header Alignment:");
+        ui.same_line();
+        if ui.radio_button("Left", &mut config.category_header_alignment, crate::config::TextAlignment::Left) {}
+        ui.same_line();
+        if ui.radio_button("Center", &mut config.category_header_alignment, crate::config::TextAlignment::Center) {}
+        ui.same_line();
+        if ui.radio_button("Right", &mut config.category_header_alignment, crate::config::TextAlignment::Right) {}
+        
+        if nexus::imgui::Slider::new("Header Padding", 0.0, 50.0)
+            .build(ui, &mut config.category_header_padding)
+        {
+        }
+    }
     
     if nexus::imgui::Slider::new("Spacing (Same Category)", 0.0, 20.0)
         .build(ui, &mut config.spacing_same_category)
@@ -143,6 +158,58 @@ pub fn render_settings(ui: &Ui) {
     {
     }
     
+    ui.separator();
+
+    ui.text("Track/Category Labels");
+    ui.text("Show labels in:");
+    ui.same_line();
+    if ui.radio_button("None##label_pos", &mut config.label_column_position, crate::config::LabelColumnPosition::None) {}
+    ui.same_line();
+    if ui.radio_button("Left##label_pos", &mut config.label_column_position, crate::config::LabelColumnPosition::Left) {}
+    ui.same_line();
+    if ui.radio_button("Right##label_pos", &mut config.label_column_position, crate::config::LabelColumnPosition::Right) {}
+
+    if config.label_column_position != crate::config::LabelColumnPosition::None {
+        ui.separator();
+        ui.text("Label Column Settings");
+        
+        if nexus::imgui::Slider::new("Label Column Width", 50.0, 300.0)
+            .build(ui, &mut config.label_column_width)
+        {
+        }
+        
+        ui.checkbox("Show Category Names", &mut config.label_column_show_category);
+        ui.checkbox("Show Track Names", &mut config.label_column_show_track);
+        
+        if nexus::imgui::Slider::new("Text Size##label_size", 0.5, 2.0)
+            .build(ui, &mut config.label_column_text_size)
+        {
+        }
+        
+        if ColorEdit::new("Background Color##label_bg", &mut config.label_column_bg_color)
+            .flags(ColorEditFlags::ALPHA_BAR)
+            .build(ui)
+        {
+        }
+        
+        if ColorEdit::new("Category Text Color##label_cat", &mut config.label_column_category_color)
+            .flags(ColorEditFlags::ALPHA_BAR)
+            .build(ui)
+        {
+        }
+        
+        if ColorEdit::new("Track Text Color##label_text", &mut config.label_column_text_color)
+            .flags(ColorEditFlags::ALPHA_BAR)
+            .build(ui)
+        {
+        }
+    }
+
+    ui.separator();
+
+    ui.text("Window Behavior");
+    ui.checkbox("Close window with ESC key", &mut config.close_on_escape);
+
     ui.separator();
     
     ui.text("Global Track Appearance");

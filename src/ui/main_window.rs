@@ -1,8 +1,8 @@
-use crate::config::{get_track_visual_config, RUNTIME_CONFIG};
+use crate::config::{get_track_visual_config, LabelColumnPosition, TextAlignment, RUNTIME_CONFIG};
 use crate::json_loader::EventTrack;
 use crate::time_utils::{format_time_only, get_current_unix_time};
 use crate::ui::time_ruler::render_time_ruler;
-use nexus::imgui::{Condition, MenuItem, MouseButton, StyleVar, Ui, Window, WindowFlags};
+use nexus::imgui::{Condition, Key, MenuItem, MouseButton, StyleVar, Ui, Window, WindowFlags};
 use std::collections::HashSet;
 
 pub fn render_main_window(ui: &Ui) {
@@ -26,6 +26,17 @@ pub fn render_main_window(ui: &Ui) {
     let draw_event_borders = config.draw_event_borders;
     let event_border_color = config.event_border_color;
     let event_border_thickness = config.event_border_thickness;
+    let header_alignment = config.category_header_alignment;
+    let header_padding = config.category_header_padding;
+    let label_column_pos = config.label_column_position;
+    let label_column_width = config.label_column_width;
+    let label_show_category = config.label_column_show_category;
+    let label_show_track = config.label_column_show_track;
+    let label_text_size = config.label_column_text_size;
+    let label_bg_color = config.label_column_bg_color;
+    let label_text_color = config.label_column_text_color;
+    let label_category_color = config.label_column_category_color;
+    let close_on_escape = config.close_on_escape;
     
     // Calculate time ONCE per frame
     let current_time = get_current_unix_time();
@@ -50,6 +61,11 @@ pub fn render_main_window(ui: &Ui) {
         .title_bar(false)
         .collapsible(false)
         .build(ui, || {
+            // Handle ESC key to close window
+            if close_on_escape && ui.is_key_pressed(Key::Escape) {
+                config.show_main_window = false;
+            }
+            
             if ui.is_window_hovered() && ui.is_mouse_clicked(MouseButton::Right) {
                 ui.open_popup("window_context_menu");
             }
@@ -70,28 +86,172 @@ pub fn render_main_window(ui: &Ui) {
                 }
             });
             
-            // Create a child window for proper scrolling and clipping
-            
             if config.show_time_ruler {
                 render_time_ruler(ui, current_time, view_range, time_position);
             }
             
             let _style_token = ui.push_style_var(StyleVar::ItemSpacing([0.0, 0.0]));
             
-            // Build ordered category list
-            let mut rendered_categories: HashSet<String> = HashSet::new();
-            let ordered_categories = config.category_order.clone();
-            
-            // First render categories in the defined order
-            for category in &ordered_categories {
-                if rendered_categories.contains(category) {
-                    continue;
+            // Determine layout based on label column position
+            match label_column_pos {
+                LabelColumnPosition::None => {
+                    // Normal rendering without label column
+                    render_timeline_content(
+                        ui,
+                        &config,
+                        show_headers,
+                        spacing_same,
+                        spacing_between,
+                        current_time,
+                        time_before_current,
+                        time_after_current,
+                        view_range,
+                        time_position,
+                        global_bg,
+                        global_padding,
+                        override_all_track_heights,
+                        global_track_height,
+                        draw_event_borders,
+                        event_border_color,
+                        event_border_thickness,
+                        header_alignment,
+                        header_padding,
+                        false, // label_column_active = false
+                    );
                 }
-                
+                LabelColumnPosition::Left => {
+                    // Label column on left, timeline on right
+                    render_with_label_column_left(
+                        ui,
+                        &config,
+                        label_column_width,
+                        show_headers,
+                        spacing_same,
+                        spacing_between,
+                        current_time,
+                        time_before_current,
+                        time_after_current,
+                        view_range,
+                        time_position,
+                        global_bg,
+                        global_padding,
+                        override_all_track_heights,
+                        global_track_height,
+                        draw_event_borders,
+                        event_border_color,
+                        event_border_thickness,
+                        header_alignment,
+                        header_padding,
+                        label_show_category,
+                        label_show_track,
+                        label_text_size,
+                        label_bg_color,
+                        label_text_color,
+                        label_category_color,
+                    );
+                }
+                LabelColumnPosition::Right => {
+                    // Timeline on left, label column on right
+                    render_with_label_column_right(
+                        ui,
+                        &config,
+                        label_column_width,
+                        show_headers,
+                        spacing_same,
+                        spacing_between,
+                        current_time,
+                        time_before_current,
+                        time_after_current,
+                        view_range,
+                        time_position,
+                        global_bg,
+                        global_padding,
+                        override_all_track_heights,
+                        global_track_height,
+                        draw_event_borders,
+                        event_border_color,
+                        event_border_thickness,
+                        header_alignment,
+                        header_padding,
+                        label_show_category,
+                        label_show_track,
+                        label_text_size,
+                        label_bg_color,
+                        label_text_color,
+                        label_category_color,
+                    );
+                }
+            }
+        });
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_timeline_content(
+    ui: &Ui,
+    config: &parking_lot::MutexGuard<crate::config::RuntimeConfig>,
+    show_headers: bool,
+    spacing_same: f32,
+    spacing_between: f32,
+    current_time: i64,
+    time_before_current: f32,
+    time_after_current: f32,
+    view_range: f32,
+    time_position: f32,
+    global_bg: [f32; 4],
+    global_padding: f32,
+    override_all_track_heights: bool,
+    global_track_height: f32,
+    draw_event_borders: bool,
+    event_border_color: [f32; 4],
+    event_border_thickness: f32,
+    header_alignment: TextAlignment,
+    header_padding: f32,
+    label_column_active: bool, // NEW PARAMETER
+) {
+    let mut rendered_categories: HashSet<String> = HashSet::new();
+    let ordered_categories = config.category_order.clone();
+    
+    // First render categories in the defined order
+    for category in &ordered_categories {
+        if rendered_categories.contains(category) {
+            continue;
+        }
+        
+        render_tracks_for_category(
+            ui,
+            config,
+            category,
+            &mut rendered_categories,
+            show_headers,
+            spacing_same,
+            spacing_between,
+            current_time,
+            time_before_current,
+            time_after_current,
+            view_range,
+            time_position,
+            global_bg,
+            global_padding,
+            override_all_track_heights,
+            global_track_height,
+            draw_event_borders,
+            event_border_color,
+            event_border_thickness,
+            header_alignment,
+            header_padding,
+            label_column_active,
+        );
+    }
+    
+    // Then render any tracks with categories not in the order
+    for track in config.tracks.iter() {
+        if !rendered_categories.contains(&track.category) && track.visible {
+            let is_category_visible = *config.category_visibility.get(&track.category).unwrap_or(&true);
+            if is_category_visible {
                 render_tracks_for_category(
                     ui,
-                    &config,
-                    category,
+                    config,
+                    &track.category,
                     &mut rendered_categories,
                     show_headers,
                     spacing_same,
@@ -108,39 +268,355 @@ pub fn render_main_window(ui: &Ui) {
                     draw_event_borders,
                     event_border_color,
                     event_border_thickness,
+                    header_alignment,
+                    header_padding,
+                    label_column_active,
                 );
             }
-            
-            // Then render any tracks with categories not in the order (shouldn't happen but safety)
-            for track in config.tracks.iter() {
-                if !rendered_categories.contains(&track.category) && track.visible {
-                    let is_category_visible = *config.category_visibility.get(&track.category).unwrap_or(&true);
-                    if is_category_visible {
-                        render_tracks_for_category(
-                            ui,
-                            &config,
-                            &track.category,
-                            &mut rendered_categories,
-                            show_headers,
-                            spacing_same,
-                            spacing_between,
-                            current_time,
-                            time_before_current,
-                            time_after_current,
-                            view_range,
-                            time_position,
-                            global_bg,
-                            global_padding,
-                            override_all_track_heights,
-                            global_track_height,
-                            draw_event_borders,
-                            event_border_color,
-                            event_border_thickness,
-                        );
-                    }
-                }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_with_label_column_left(
+    ui: &Ui,
+    config: &parking_lot::MutexGuard<crate::config::RuntimeConfig>,
+    label_column_width: f32,
+    show_headers: bool,
+    spacing_same: f32,
+    spacing_between: f32,
+    current_time: i64,
+    time_before_current: f32,
+    time_after_current: f32,
+    view_range: f32,
+    time_position: f32,
+    global_bg: [f32; 4],
+    global_padding: f32,
+    override_all_track_heights: bool,
+    global_track_height: f32,
+    draw_event_borders: bool,
+    event_border_color: [f32; 4],
+    event_border_thickness: f32,
+    header_alignment: TextAlignment,
+    header_padding: f32,
+    label_show_category: bool,
+    label_show_track: bool,
+    label_text_size: f32,
+    label_bg_color: [f32; 4],
+    label_text_color: [f32; 4],
+    label_category_color: [f32; 4],
+) {
+    // Use columns for side-by-side layout without breaking scrolling
+    ui.columns(2, "label_timeline_cols", false);
+    ui.set_column_width(0, label_column_width);
+    
+    // Label column (first column)
+    render_label_column(
+        ui,
+        config,
+        show_headers,
+        spacing_same,
+        spacing_between,
+        override_all_track_heights,
+        global_track_height,
+        label_show_category,
+        label_show_track,
+        label_text_size,
+        label_bg_color,
+        label_text_color,
+        label_category_color,
+    );
+    
+    ui.next_column();
+    
+    // Timeline (second column)
+    render_timeline_content(
+        ui,
+        config,
+        show_headers,
+        spacing_same,
+        spacing_between,
+        current_time,
+        time_before_current,
+        time_after_current,
+        view_range,
+        time_position,
+        global_bg,
+        global_padding,
+        override_all_track_heights,
+        global_track_height,
+        draw_event_borders,
+        event_border_color,
+        event_border_thickness,
+        header_alignment,
+        header_padding,
+        true, // label_column_active = true
+    );
+    
+    ui.columns(1, "", false); // Reset to single column
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_with_label_column_right(
+    ui: &Ui,
+    config: &parking_lot::MutexGuard<crate::config::RuntimeConfig>,
+    label_column_width: f32,
+    show_headers: bool,
+    spacing_same: f32,
+    spacing_between: f32,
+    current_time: i64,
+    time_before_current: f32,
+    time_after_current: f32,
+    view_range: f32,
+    time_position: f32,
+    global_bg: [f32; 4],
+    global_padding: f32,
+    override_all_track_heights: bool,
+    global_track_height: f32,
+    draw_event_borders: bool,
+    event_border_color: [f32; 4],
+    event_border_thickness: f32,
+    header_alignment: TextAlignment,
+    header_padding: f32,
+    label_show_category: bool,
+    label_show_track: bool,
+    label_text_size: f32,
+    label_bg_color: [f32; 4],
+    label_text_color: [f32; 4],
+    label_category_color: [f32; 4],
+) {
+    let available_width = ui.content_region_avail()[0];
+    let timeline_width = available_width - label_column_width;
+    
+    // Use columns for side-by-side layout without breaking scrolling
+    ui.columns(2, "timeline_label_cols", false);
+    ui.set_column_width(0, timeline_width);
+    
+    // Timeline (first column)
+    render_timeline_content(
+        ui,
+        config,
+        show_headers,
+        spacing_same,
+        spacing_between,
+        current_time,
+        time_before_current,
+        time_after_current,
+        view_range,
+        time_position,
+        global_bg,
+        global_padding,
+        override_all_track_heights,
+        global_track_height,
+        draw_event_borders,
+        event_border_color,
+        event_border_thickness,
+        header_alignment,
+        header_padding,
+        true, // label_column_active = true
+    );
+    
+    ui.next_column();
+    
+    // Label column (second column)
+    render_label_column(
+        ui,
+        config,
+        show_headers,
+        spacing_same,
+        spacing_between,
+        override_all_track_heights,
+        global_track_height,
+        label_show_category,
+        label_show_track,
+        label_text_size,
+        label_bg_color,
+        label_text_color,
+        label_category_color,
+    );
+    
+    ui.columns(1, "", false); // Reset to single column
+}
+
+fn render_label_column(
+    ui: &Ui,
+    config: &parking_lot::MutexGuard<crate::config::RuntimeConfig>,
+    show_headers: bool,
+    spacing_same: f32,
+    spacing_between: f32,
+    override_all_track_heights: bool,
+    global_track_height: f32,
+    label_show_category: bool,
+    label_show_track: bool,
+    label_text_size: f32,
+    label_bg_color: [f32; 4],
+    label_text_color: [f32; 4],
+    label_category_color: [f32; 4],
+) {
+    let mut rendered_categories: HashSet<String> = HashSet::new();
+    let ordered_categories = config.category_order.clone();
+    let mut needs_spacing = false;
+    
+    // Render in order
+    for category in &ordered_categories {
+        if rendered_categories.contains(category) {
+            continue;
+        }
+        
+        render_label_column_for_category(
+            ui,
+            config,
+            category,
+            &mut rendered_categories,
+            show_headers,
+            spacing_same,
+            spacing_between,
+            override_all_track_heights,
+            global_track_height,
+            &mut needs_spacing,
+            label_show_category,
+            label_show_track,
+            label_text_size,
+            label_bg_color,
+            label_text_color,
+            label_category_color,
+        );
+    }
+    
+    // Render remaining categories
+    for track in config.tracks.iter() {
+        if !rendered_categories.contains(&track.category) && track.visible {
+            let is_category_visible = *config.category_visibility.get(&track.category).unwrap_or(&true);
+            if is_category_visible {
+                render_label_column_for_category(
+                    ui,
+                    config,
+                    &track.category,
+                    &mut rendered_categories,
+                    show_headers,
+                    spacing_same,
+                    spacing_between,
+                    override_all_track_heights,
+                    global_track_height,
+                    &mut needs_spacing,
+                    label_show_category,
+                    label_show_track,
+                    label_text_size,
+                    label_bg_color,
+                    label_text_color,
+                    label_category_color,
+                );
             }
-        });
+        }
+    }
+}
+
+fn render_label_column_for_category(
+    ui: &Ui,
+    config: &parking_lot::MutexGuard<crate::config::RuntimeConfig>,
+    category: &str,
+    rendered_categories: &mut HashSet<String>,
+    show_headers: bool,
+    spacing_same: f32,
+    spacing_between: f32,
+    override_all_track_heights: bool,
+    global_track_height: f32,
+    needs_spacing: &mut bool,
+    label_show_category: bool,
+    label_show_track: bool,
+    _label_text_size: f32,
+    label_bg_color: [f32; 4],
+    label_text_color: [f32; 4],
+    label_category_color: [f32; 4],
+) {
+    if rendered_categories.contains(category) {
+        return;
+    }
+    
+    let is_category_visible = *config.category_visibility.get(category).unwrap_or(&true);
+    if !is_category_visible {
+        rendered_categories.insert(category.to_string());
+        return;
+    }
+    
+    let mut first_visible_in_category = true;
+    let draw_list = ui.get_window_draw_list();
+    
+    for track in config.tracks.iter() {
+        if track.category != category || !track.visible {
+            continue;
+        }
+        
+        if first_visible_in_category {
+            if *needs_spacing {
+                ui.dummy([0.0, spacing_between]);
+            }
+            
+            if show_headers && !category.is_empty() {
+                // Category header with same height as timeline header
+                let cursor_pos = ui.cursor_screen_pos();
+                let available_width = ui.content_region_avail()[0];
+                let text_size = ui.calc_text_size(category);
+                let header_height = text_size[1] + 10.0;
+                
+                // Background for category (if enabled)
+                if label_bg_color[3] > 0.0 {
+                    draw_list.add_rect(
+                        cursor_pos,
+                        [cursor_pos[0] + available_width, cursor_pos[1] + header_height],
+                        label_bg_color,
+                    ).filled(true).build();
+                }
+                
+                // Category text (if enabled) - uses separate category color
+                if label_show_category {
+                    // Note: Font scaling in nexus imgui is limited, using regular text
+                    let text_pos = [cursor_pos[0] + 5.0, cursor_pos[1] + 5.0];
+                    draw_list.add_text(text_pos, label_category_color, category);
+                }
+                
+                ui.dummy([0.0, header_height]);
+            }
+            
+            first_visible_in_category = false;
+            *needs_spacing = true;
+        } else {
+            ui.dummy([0.0, spacing_same]);
+        }
+        
+        // Track label - match exact height of timeline track
+        let track_height = if override_all_track_heights {
+            global_track_height
+        } else {
+            track.height
+        };
+        
+        let cursor_pos = ui.cursor_screen_pos();
+        let available_width = ui.content_region_avail()[0];
+        
+        // Draw background matching track background
+        if label_bg_color[3] > 0.0 {
+            draw_list.add_rect(
+                cursor_pos,
+                [cursor_pos[0] + available_width, cursor_pos[1] + track_height],
+                label_bg_color,
+            ).filled(true).build();
+        }
+        
+        // Draw track name (if enabled) - vertically centered
+        if label_show_track {
+            // Note: Font scaling in nexus imgui is limited, using regular text
+            let text_size = ui.calc_text_size(&track.name);
+            let text_y_offset = (track_height - text_size[1]) / 2.0;
+            let text_pos = [cursor_pos[0] + 5.0, cursor_pos[1] + text_y_offset];
+            draw_list.add_text(text_pos, label_text_color, &track.name);
+        }
+        
+        // Dummy with EXACT track height to match timeline
+        ui.dummy([available_width, track_height]);
+    }
+    
+    rendered_categories.insert(category.to_string());
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -164,6 +640,9 @@ fn render_tracks_for_category(
     draw_event_borders: bool,
     event_border_color: [f32; 4],
     event_border_thickness: f32,
+    header_alignment: TextAlignment,
+    header_padding: f32,
+    label_column_active: bool, // NEW PARAMETER
 ) {
     if rendered_categories.contains(category) {
         return;
@@ -188,8 +667,14 @@ fn render_tracks_for_category(
                 ui.dummy([0.0, spacing_between]);
             }
 
-            if show_headers && !category.is_empty() {
-                render_category_header(ui, category);
+            // Only show header if label column is NOT active
+            if show_headers && !category.is_empty() && !label_column_active {
+                render_category_header(ui, category, header_alignment, header_padding);
+            } else if show_headers && !category.is_empty() && label_column_active {
+                // Just add spacing to match the label column's category header height
+                let text_size = ui.calc_text_size(category);
+                let header_height = text_size[1] + 10.0;
+                ui.dummy([0.0, header_height]);
             }
             
             first_visible_in_category = false;
@@ -214,54 +699,43 @@ fn render_tracks_for_category(
             event_border_thickness,
         );
     }
-    
+
     rendered_categories.insert(category.to_string());
 }
 
-// FIXED: Use window draw list which automatically clips to window bounds
-fn render_category_header(ui: &Ui, category: &str) {
-    let cursor_pos = ui.cursor_screen_pos();
+fn render_category_header(ui: &Ui, category: &str, alignment: TextAlignment, padding: f32) {
     let available_width = ui.content_region_avail()[0];
     let text_size = ui.calc_text_size(category);
     
-    let padding = 2.0;
-    let rect_height = text_size[1] + padding * 2.0;
-
-    // Use window draw list - it automatically clips to the child window's scroll region
+    // Calculate X position based on alignment
+    let x_offset = match alignment {
+        TextAlignment::Left => padding,
+        TextAlignment::Center => (available_width - text_size[0]) / 2.0,
+        TextAlignment::Right => available_width - text_size[0] - padding,
+    };
+    
+    // Draw using background draw list for full width coverage
     let draw_list = ui.get_window_draw_list();
+    let cursor_pos = ui.cursor_screen_pos();
+    let header_height = text_size[1] + 10.0;
     
-    let rect_start = [cursor_pos[0], cursor_pos[1]];
-    let rect_end = [cursor_pos[0] + available_width, cursor_pos[1] + rect_height];
-    
-    draw_list.add_rect(rect_start, rect_end, [0.0, 0.0, 0.0, 0.6])
+    // Semi-transparent background
+    draw_list
+        .add_rect(
+            cursor_pos,
+            [cursor_pos[0] + available_width, cursor_pos[1] + header_height],
+            [0.15, 0.15, 0.15, 0.8],
+        )
         .filled(true)
         .build();
-
-    let text_pos = [
-        cursor_pos[0] + (available_width - text_size[0]) / 2.0,
-        cursor_pos[1] + padding
-    ];
-    draw_list.add_text(text_pos, [0.9, 0.9, 0.9, 1.0], category);
     
-    ui.dummy([0.0, rect_height]);
+    // Category text with alignment
+    let text_pos = [cursor_pos[0] + x_offset, cursor_pos[1] + 5.0];
+    draw_list.add_text(text_pos, [0.8, 0.8, 0.2, 1.0], category);
+    
+    ui.dummy([available_width, header_height]);
 }
 
-/// Chooses black or white text color based on the background luminance.
-fn get_text_color_for_bg(bg_color: [f32; 4]) -> [f32; 4] {
-    let r = bg_color[0];
-    let g = bg_color[1];
-    let b = bg_color[2];
-
-    let luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-    if luminance > 0.5 {
-        [0.0, 0.0, 0.0, 1.0] 
-    } else {
-        [1.0, 1.0, 1.0, 1.0]
-    }
-}
-
-// Pass precalculated time values instead of recalculating
 #[allow(clippy::too_many_arguments)]
 fn render_timeline_track(
     ui: &Ui,
@@ -279,11 +753,10 @@ fn render_timeline_track(
     event_border_color: [f32; 4],
     event_border_thickness: f32,
 ) {
+    let visual = get_track_visual_config(&track.name, global_bg, global_padding);
     let draw_list = ui.get_window_draw_list();
     let cursor_pos = ui.cursor_screen_pos();
     let available_width = ui.content_region_avail()[0];
-
-    let visual = get_track_visual_config(&track.name, global_bg, global_padding);
 
     let track_height = if override_all_track_heights {
         global_track_height
@@ -495,4 +968,13 @@ fn handle_track_tooltip(
 
     // No event found, show track name
     ui.tooltip_text(&track.name);
+}
+
+fn get_text_color_for_bg(bg_color: [f32; 4]) -> [f32; 4] {
+    let luminance = 0.299 * bg_color[0] + 0.587 * bg_color[1] + 0.114 * bg_color[2];
+    if luminance > 0.5 {
+        [0.0, 0.0, 0.0, 1.0] // Black text on bright background
+    } else {
+        [1.0, 1.0, 1.0, 1.0] // White text on dark background
+    }
 }
