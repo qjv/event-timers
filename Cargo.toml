@@ -1,6 +1,6 @@
 [package]
 name = "event_timers"
-version = "1.0.6"
+version = "1.0.7"
 edition = "2021"
 authors = ["hvaren"]
 description = "Event timers port to Nexus, based on the wiki page of same name."

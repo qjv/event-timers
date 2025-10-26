@@ -66,11 +66,8 @@ pub fn check_for_event_tracks_update() {
                                             nexus::log::log(
                                                 nexus::log::LogLevel::Info,
                                                 "Event Timers",
-                                                "event_tracks.json updated! Reloading..."
+                                                "event_tracks.json updated! Reload addon (Ctrl+Shift+L) to apply."
                                             );
-                                            
-                                            // Reload config immediately
-                                            crate::config::apply_user_overrides();
                                         }
                                         Err(e) => {
                                             nexus::log::log(
@@ -498,43 +495,94 @@ fn render_default_track_editor_inline(ui: &Ui, track: &mut EventTrack) {
     ui.separator();
     ui.text("Events");
     
-    if let Some(_t) = ui.begin_table_with_flags("Events", 4, TableFlags::BORDERS | TableFlags::ROW_BG) {
-        ui.table_setup_column("Name");
-        ui.table_setup_column("Start");
-        ui.table_setup_column("Duration");
-        ui.table_setup_column("Enabled");
-        ui.table_headers_row();
+    // Collect changes to apply after iteration
+    let mut changes: Vec<(String, Option<bool>, Option<[f32; 4]>, Option<i64>, Option<i64>)> = Vec::new();
+    
+    // Use collapsing headers instead of a table for more space
+    let mut seen_names = HashSet::new();
+    
+    for event in track.events.iter() {
+        if seen_names.contains(&event.name) { continue; }
+        seen_names.insert(event.name.clone());
         
-        let mut seen_names = HashSet::new();
-        let mut state_changes: Vec<(String, bool)> = Vec::new();
+        let node_label = if event.enabled {
+            format!("✓ {}", event.name)
+        } else {
+            format!("✗ {}", event.name)
+        };
         
-        for event in track.events.iter() {
-            if seen_names.contains(&event.name) { continue; }
-            seen_names.insert(event.name.clone());
+        if ui.collapsing_header(&node_label, TreeNodeFlags::DEFAULT_OPEN) {
+            ui.indent();
             
-            ui.table_next_row();
-            
-            ui.table_next_column();
-            ui.text(&event.name);
-            
-            ui.table_next_column();
-            ui.text(format!("{}m", event.start_offset / 60));
-            
-            ui.table_next_column();
-            ui.text(format!("{}m", event.duration / 60));
-            
-            ui.table_next_column();
-            
+            // Enable/Disable checkbox
             let mut current_enabled = event.enabled;
-            if ui.checkbox(&format!("##enabled_{}", event.name), &mut current_enabled) {
-                state_changes.push((event.name.clone(), current_enabled));
+            let enabled_changed = ui.checkbox(&format!("Enabled##{}", event.name), &mut current_enabled);
+            
+            // Color picker
+            let mut color = event.color.to_array();
+            let color_changed = ColorEdit::new(&format!("Color##{}", event.name), &mut color)
+                .flags(ColorEditFlags::ALPHA_BAR)
+                .build(ui);
+            
+            // Start offset editor
+            let mut start_min = (event.start_offset / 60) as i32;
+            let offset_changed = nexus::imgui::InputInt::new(ui, &format!("Start Offset (min)##{}", event.name), &mut start_min).build();
+            
+            // Duration editor
+            let mut duration_min = (event.duration / 60) as i32;
+            let duration_changed = nexus::imgui::InputInt::new(ui, &format!("Duration (min)##{}", event.name), &mut duration_min).build();
+            
+            ui.text_disabled(&format!("Cycle: {}m", event.cycle_duration / 60));
+            
+            // Reset button
+            let reset_clicked = ui.button(&format!("Reset to Default##{}", event.name));
+            
+            // Collect changes
+            if enabled_changed || color_changed || offset_changed || duration_changed || reset_clicked {
+                if reset_clicked {
+                    // Load defaults and schedule reset
+                    let (default_tracks, _) = load_tracks_from_json();
+                    if let Some(default_track) = default_tracks.iter().find(|t| t.name == track.name) {
+                        if let Some(default_event) = default_track.events.iter().find(|e| e.name == event.name) {
+                            changes.push((
+                                event.name.clone(),
+                                Some(default_event.enabled),
+                                Some(default_event.color.to_array()),
+                                Some(default_event.start_offset),
+                                Some(default_event.duration),
+                            ));
+                        }
+                    }
+                } else {
+                    changes.push((
+                        event.name.clone(),
+                        if enabled_changed { Some(current_enabled) } else { None },
+                        if color_changed { Some(color) } else { None },
+                        if offset_changed { Some((start_min as i64) * 60) } else { None },
+                        if duration_changed { Some((duration_min.max(1) as i64) * 60) } else { None },
+                    ));
+                }
             }
+            
+            ui.unindent();
         }
-        
-        for (name, new_enabled) in state_changes {
-            for e in track.events.iter_mut() {
-                if e.name == name {
-                    e.enabled = new_enabled;
+    }
+    
+    // Apply all collected changes
+    for (event_name, new_enabled, new_color, new_offset, new_duration) in changes {
+        for e in track.events.iter_mut() {
+            if e.name == event_name {
+                if let Some(enabled) = new_enabled {
+                    e.enabled = enabled;
+                }
+                if let Some(color) = new_color {
+                    e.color = EventColor::from_array(color);
+                }
+                if let Some(offset) = new_offset {
+                    e.start_offset = offset;
+                }
+                if let Some(duration) = new_duration {
+                    e.duration = duration;
                 }
             }
         }
