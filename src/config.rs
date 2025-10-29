@@ -136,7 +136,7 @@ pub struct UserConfig {
     pub label_column_text_size: f32,
     #[serde(default)]
     pub label_column_bg_color: [f32; 4],
-    #[serde(default)]
+    #[serde(default = "default_label_text_color")]
     pub label_column_text_color: [f32; 4],
     #[serde(default = "default_label_category_color")]
     pub label_column_category_color: [f32; 4],
@@ -150,6 +150,7 @@ fn default_border_thickness() -> f32 { 1.0 }
 fn default_height() -> f32 { 40.0 }
 fn default_label_column_width() -> f32 { 150.0 }
 fn default_label_text_size() -> f32 { 1.0 }
+fn default_label_text_color() -> [f32; 4] { [1.0, 1.0, 1.0, 1.0] } // White
 fn default_label_category_color() -> [f32; 4] { [0.8, 0.8, 0.2, 1.0] } // Yellow like default
 
 fn default_true() -> bool { true }
@@ -194,7 +195,7 @@ impl Default for UserConfig {
             label_column_bg_color: [0.0, 0.0, 0.0, 0.0],
             label_column_text_color: [1.0, 1.0, 1.0, 1.0],
             label_column_category_color: [0.8, 0.8, 0.2, 1.0],
-            close_on_escape: false,
+            close_on_escape: true,
         }
     }
 }
