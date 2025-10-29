@@ -2,7 +2,7 @@ use nexus::paths::get_addon_dir;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::{HashMap, HashSet}, fs, path::PathBuf};
 
 use crate::json_loader::{load_tracks_from_json, EventTrack};
 
@@ -290,13 +290,37 @@ pub static SELECTED_EVENT: Lazy<Mutex<Option<usize>>> = Lazy::new(|| Mutex::new(
 // === Configuration Management ===
 
 pub fn apply_user_overrides() {
-    let user_cfg = USER_CONFIG.lock();
+    let mut user_cfg = USER_CONFIG.lock();
     let mut runtime = RUNTIME_CONFIG.lock();
     
+    // Load fresh tracks from JSON
     let (default_tracks, categories) = load_tracks_from_json();
+    
+    // Deduplicate custom tracks by name (keep first occurrence)
+    let mut seen_custom_track_names: HashSet<String> = HashSet::new();
+    user_cfg.custom_tracks.retain(|track| {
+        if seen_custom_track_names.contains(&track.name) {
+            false // Remove duplicate
+        } else {
+            seen_custom_track_names.insert(track.name.clone());
+            true // Keep first occurrence
+        }
+    });
+    
+    // Remove custom tracks that now exist in default JSON
+    let default_track_names: HashSet<String> = default_tracks.iter()
+        .map(|t| t.name.clone())
+        .collect();
+    
+    user_cfg.custom_tracks.retain(|track| {
+        !default_track_names.contains(&track.name)
+    });
+    
+    // Set runtime tracks to defaults + clean custom tracks
     runtime.tracks = default_tracks;
     runtime.categories = categories;
     
+    // Apply user overrides to default tracks
     for track in &mut runtime.tracks {
         if let Some(override_data) = user_cfg.track_overrides.get(&track.name) {
             if let Some(visible) = override_data.visible {
@@ -314,6 +338,7 @@ pub fn apply_user_overrides() {
         }
     }
     
+    // Add deduplicated custom tracks
     runtime.tracks.extend(user_cfg.custom_tracks.iter().cloned());
     
     runtime.show_main_window = user_cfg.show_main_window;
@@ -427,7 +452,7 @@ pub fn extract_user_overrides() {
 
 // === File I/O ===
 
-fn get_user_config_path() -> Option<PathBuf> {
+pub fn get_user_config_path() -> Option<PathBuf> {
     get_addon_dir("event_timers").map(|p| p.join(USER_CONFIG_FILENAME))
 }
 

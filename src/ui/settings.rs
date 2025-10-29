@@ -192,17 +192,37 @@ pub fn render_settings(ui: &Ui) {
         {
         }
         
-        if ColorEdit::new("Category Text Color##label_cat", &mut config.label_column_category_color)
-            .flags(ColorEditFlags::ALPHA_BAR)
-            .build(ui)
-        {
-        }
-        
         if ColorEdit::new("Track Text Color##label_text", &mut config.label_column_text_color)
             .flags(ColorEditFlags::ALPHA_BAR)
             .build(ui)
         {
         }
+        
+        if ColorEdit::new("Category Text Color##label_cat", &mut config.label_column_category_color)
+            .flags(ColorEditFlags::ALPHA_BAR)
+            .build(ui)
+        {
+        }
+    }
+
+    ui.separator();
+    ui.text("Window Behavior");
+    ui.checkbox("Close window with ESC key", &mut config.close_on_escape);
+
+    ui.separator();
+    ui.text_colored([1.0, 0.5, 0.0, 1.0], "Maintenance");
+
+    if ui.button("Reset All Settings") {
+        if let Some(config_path) = crate::config::get_user_config_path() {
+            if std::fs::remove_file(&config_path).is_ok() {
+                // Reload default config
+                *crate::config::USER_CONFIG.lock() = crate::config::UserConfig::default();
+                crate::config::apply_user_overrides();
+            }
+        }
+    }
+    if ui.is_item_hovered() {
+        ui.tooltip_text("Delete config file and reset to defaults.\nUse this to fix corrupted configurations.");
     }
 
     ui.separator();
