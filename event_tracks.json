@@ -1,5 +1,5 @@
 {
-  "version": "1.0.8",
+  "version": "1.1.1",
   "hash": "",
   "categories": [
       {
@@ -1687,9 +1687,9 @@
           "schedules": [
             {
               "name": "Hammerhart Rumble!",
-              "offset": 105,
+              "offset": 100,
               "interval": 120,
-              "duration": 20,
+              "duration": 15,
               "color": [
                 0.95,
                 0.35,
