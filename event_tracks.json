@@ -1674,6 +1674,57 @@
           "events": []
         }
       ]
+    },
+    {
+      "name": "Visions of Eternity",
+      "tracks": [
+        {
+          "name": "Shipwreck Strand",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Hammerhart Rumble!",
+              "offset": 105,
+              "interval": 120,
+              "duration": 20,
+              "color": [
+                0.95,
+                0.35,
+                0.15,
+                1
+              ],
+              "copy_text": ""
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Starlit Weald",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": true,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Secrets of the Weald",
+              "offset": 45,
+              "interval": 120,
+              "duration": 20,
+              "color": [
+                0.6,
+                0.3,
+                0.9,
+                1
+              ],
+              "copy_text": ""
+            }
+          ],
+          "events": []
+        }
+      ]
     }
   ]
 }
