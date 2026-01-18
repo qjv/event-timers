@@ -11,11 +11,17 @@ use std::ffi::c_char;
 
 mod config;
 mod json_loader;
+mod notification_logic;
+mod notifications;
 mod time_utils;
 mod ui;
 
 use config::{load_user_config, save_user_config, RUNTIME_CONFIG};
-use ui::{render_main_window, render_settings, check_for_event_tracks_update};
+use notification_logic::update_notifications;
+use ui::{
+    check_for_event_tracks_update, render_main_window, render_settings,
+    render_toast_notifications, render_upcoming_panel,
+};
 
 // Embed icon files directly in the binary
 const QA_ICON: &[u8] = include_bytes!("../qa_icon.png");
@@ -25,6 +31,20 @@ extern "C-unwind" fn toggle_window_keybind(_identifier: *const c_char, is_releas
     if !is_release {
         let mut config = RUNTIME_CONFIG.lock();
         config.show_main_window = !config.show_main_window;
+    }
+}
+
+extern "C-unwind" fn toggle_toasts_keybind(_identifier: *const c_char, is_release: bool) {
+    if !is_release {
+        let mut config = RUNTIME_CONFIG.lock();
+        config.notification_config.toast_enabled = !config.notification_config.toast_enabled;
+    }
+}
+
+extern "C-unwind" fn toggle_upcoming_panel_keybind(_identifier: *const c_char, is_release: bool) {
+    if !is_release {
+        let mut config = RUNTIME_CONFIG.lock();
+        config.notification_config.upcoming_panel_enabled = !config.notification_config.upcoming_panel_enabled;
     }
 }
 
@@ -49,9 +69,18 @@ fn load() {
     
     register_keybind_with_string("Toggle Event Timers", toggle_window_keybind, "ALT+E")
         .revert_on_unload();
+
+    register_keybind_with_string("Toggle Toast Notifications", toggle_toasts_keybind, "")
+        .revert_on_unload();
+
+    register_keybind_with_string("Toggle Upcoming Panel", toggle_upcoming_panel_keybind, "")
+        .revert_on_unload();
     
     register_render(RenderType::Render, render!(|ui| {
+        update_notifications();
         render_main_window(ui);
+        render_toast_notifications(ui);
+        render_upcoming_panel(ui);
     }))
     .revert_on_unload();
     

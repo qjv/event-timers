@@ -1,16 +1,49 @@
 use crate::config::{get_track_visual_config, LabelColumnPosition, TextAlignment, RUNTIME_CONFIG};
 use crate::json_loader::EventTrack;
+use crate::notification_logic::toggle_event_tracking;
 use crate::time_utils::{format_time_only, get_current_unix_time};
 use crate::ui::time_ruler::render_time_ruler;
 use nexus::imgui::{Condition, Key, MenuItem, MouseButton, StyleVar, Ui, Window, WindowFlags};
+use std::cell::RefCell;
 use std::collections::HashSet;
 
+use std::collections::HashSet as StdHashSet;
+use crate::config::TrackedEventId;
+
+// Thread-local storage for right-clicked event info
+// Stores (track_name, event_name, is_currently_tracked)
+thread_local! {
+    static CONTEXT_EVENT: RefCell<Option<(String, String, bool)>> = const { RefCell::new(None) };
+    static OPEN_EVENT_MENU: RefCell<bool> = const { RefCell::new(false) };
+    static PENDING_TRACK_TOGGLE: RefCell<Option<(String, String)>> = const { RefCell::new(None) };
+    // Cached tracked events for the current frame (to avoid re-locking)
+    static CACHED_TRACKED_EVENTS: RefCell<StdHashSet<TrackedEventId>> = RefCell::new(StdHashSet::new());
+    // Cached copy setting for the current frame
+    static CACHED_COPY_WITH_EVENT_NAME: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 pub fn render_main_window(ui: &Ui) {
+    // Handle any pending track toggle (must be done before locking config)
+    let pending = PENDING_TRACK_TOGGLE.with(|p| p.borrow_mut().take());
+    if let Some((track_name, event_name)) = pending {
+        toggle_event_tracking(&track_name, &event_name);
+    }
+
     let mut config = RUNTIME_CONFIG.lock();
 
     if !config.show_main_window {
         return;
     }
+
+    // Cache tracked events for this frame (to avoid re-locking in tooltip handler)
+    CACHED_TRACKED_EVENTS.with(|c| {
+        *c.borrow_mut() = config.tracked_events.clone();
+    });
+
+    // Cache copy setting for this frame
+    CACHED_COPY_WITH_EVENT_NAME.with(|c| {
+        c.set(config.copy_with_event_name);
+    });
 
     // Cache all config values ONCE at start
     let view_range = config.view_range_seconds;
@@ -37,7 +70,7 @@ pub fn render_main_window(ui: &Ui) {
     let label_text_color = config.label_column_text_color;
     let label_category_color = config.label_column_category_color;
     let close_on_escape = config.close_on_escape;
-    
+
     // Calculate time ONCE per frame
     let current_time = get_current_unix_time();
     let time_before_current = view_range * time_position;
@@ -66,15 +99,25 @@ pub fn render_main_window(ui: &Ui) {
                 config.show_main_window = false;
             }
             
-            if ui.is_window_hovered() && ui.is_mouse_clicked(MouseButton::Right) {
+            // Check if we need to open the event tracking menu (set by tooltip handler)
+            let should_open_event_menu = OPEN_EVENT_MENU.with(|f| {
+                let val = *f.borrow();
+                *f.borrow_mut() = false; // Reset flag
+                val
+            });
+
+            if should_open_event_menu {
+                ui.open_popup("event_track_menu");
+            } else if ui.is_window_hovered() && ui.is_mouse_clicked(MouseButton::Right) {
                 ui.open_popup("window_context_menu");
             }
+
             ui.popup("window_context_menu", || {
                 let is_locked = config.is_window_locked;
                 if MenuItem::new("Lock Window").selected(is_locked).build(ui) {
                     config.is_window_locked = !is_locked;
                 }
-                
+
                 let hide_bg = config.hide_background;
                 if MenuItem::new("Hide Background").selected(hide_bg).build(ui) {
                     config.hide_background = !hide_bg;
@@ -85,9 +128,34 @@ pub fn render_main_window(ui: &Ui) {
                     config.show_scrollbar = !show_sb;
                 }
             });
+
+            // Event tracking context menu
+            ui.popup("event_track_menu", || {
+                CONTEXT_EVENT.with(|e| {
+                    if let Some((track_name, event_name, was_tracked)) = e.borrow().clone() {
+                        let label = if was_tracked {
+                            format!("Untrack: {}", event_name)
+                        } else {
+                            format!("Track: {}", event_name)
+                        };
+
+                        if MenuItem::new(&label).build(ui) {
+                            // Queue the toggle for next frame (avoids deadlock)
+                            PENDING_TRACK_TOGGLE.with(|p| {
+                                *p.borrow_mut() = Some((track_name, event_name));
+                            });
+                        }
+                    }
+                });
+            });
             
             if config.show_time_ruler {
-                render_time_ruler(ui, current_time, view_range, time_position);
+                // Calculate label offset for time ruler alignment
+                let label_offset = match label_column_pos {
+                    LabelColumnPosition::Left => label_column_width,
+                    _ => 0.0,
+                };
+                render_time_ruler(ui, current_time, view_range, time_position, label_offset);
             }
             
             let _style_token = ui.push_style_var(StyleVar::ItemSpacing([0.0, 0.0]));
@@ -958,7 +1026,29 @@ fn handle_track_tooltip(
                 });
 
                 if ui.is_mouse_clicked(MouseButton::Left) && !event.copy_text.is_empty() {
-                    ui.set_clipboard_text(&event.copy_text);
+                    let copy_text = CACHED_COPY_WITH_EVENT_NAME.with(|c| {
+                        if c.get() {
+                            format!("{}: {}", event.name, event.copy_text)
+                        } else {
+                            event.copy_text.clone()
+                        }
+                    });
+                    ui.set_clipboard_text(&copy_text);
+                }
+
+                // Right-click to track/untrack event
+                if ui.is_mouse_clicked(MouseButton::Right) {
+                    // Check tracked status from cached value (avoids deadlock)
+                    let is_tracked = CACHED_TRACKED_EVENTS.with(|c| {
+                        let event_id = TrackedEventId::new(&track.name, &event.name);
+                        c.borrow().contains(&event_id)
+                    });
+                    CONTEXT_EVENT.with(|e| {
+                        *e.borrow_mut() = Some((track.name.clone(), event.name.clone(), is_tracked));
+                    });
+                    OPEN_EVENT_MENU.with(|f| {
+                        *f.borrow_mut() = true;
+                    });
                 }
 
                 return; // Found event, exit early
