@@ -1,6 +1,6 @@
 use crate::config::{get_track_visual_config, LabelColumnPosition, TextAlignment, RUNTIME_CONFIG};
 use crate::json_loader::EventTrack;
-use crate::notification_logic::toggle_event_tracking;
+use crate::notification_logic::{toggle_event_tracking, toggle_oneshot_tracking};
 use crate::time_utils::{format_time_only, get_current_unix_time};
 use crate::ui::time_ruler::render_time_ruler;
 use nexus::imgui::{Condition, Key, MenuItem, MouseButton, StyleVar, Ui, Window, WindowFlags};
@@ -11,25 +11,53 @@ use std::collections::HashSet as StdHashSet;
 use crate::config::TrackedEventId;
 
 // Thread-local storage for right-clicked event info
-// Stores (track_name, event_name, is_currently_tracked)
+// Stores (track_name, event_name, is_currently_tracked, is_oneshot_tracked)
 thread_local! {
-    static CONTEXT_EVENT: RefCell<Option<(String, String, bool)>> = const { RefCell::new(None) };
+    static CONTEXT_EVENT: RefCell<Option<(String, String, bool, bool)>> = const { RefCell::new(None) };
     static OPEN_EVENT_MENU: RefCell<bool> = const { RefCell::new(false) };
-    static PENDING_TRACK_TOGGLE: RefCell<Option<(String, String)>> = const { RefCell::new(None) };
+    static PENDING_TRACK_TOGGLE: RefCell<Option<(String, String, bool)>> = const { RefCell::new(None) }; // (track, event, is_oneshot)
+    static PENDING_WIKI_OPEN: RefCell<Option<String>> = const { RefCell::new(None) };
     // Cached tracked events for the current frame (to avoid re-locking)
     static CACHED_TRACKED_EVENTS: RefCell<StdHashSet<TrackedEventId>> = RefCell::new(StdHashSet::new());
+    static CACHED_ONESHOT_EVENTS: RefCell<StdHashSet<TrackedEventId>> = RefCell::new(StdHashSet::new());
     // Cached copy setting for the current frame
     static CACHED_COPY_WITH_EVENT_NAME: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    // Track ESC key state for debouncing
+    static ESC_WAS_DOWN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 pub fn render_main_window(ui: &Ui) {
     // Handle any pending track toggle (must be done before locking config)
     let pending = PENDING_TRACK_TOGGLE.with(|p| p.borrow_mut().take());
-    if let Some((track_name, event_name)) = pending {
-        toggle_event_tracking(&track_name, &event_name);
+    if let Some((track_name, event_name, is_oneshot)) = pending {
+        if is_oneshot {
+            toggle_oneshot_tracking(&track_name, &event_name);
+        } else {
+            toggle_event_tracking(&track_name, &event_name);
+        }
+    }
+
+    // Handle pending wiki open
+    let wiki_event = PENDING_WIKI_OPEN.with(|p| p.borrow_mut().take());
+    if let Some(event_name) = wiki_event {
+        let search_query = event_name.replace(' ', "+");
+        let url = format!("https://wiki.guildwars2.com/wiki/?search={}", search_query);
+        let _ = open::that(url);
     }
 
     let mut config = RUNTIME_CONFIG.lock();
+
+    // Handle ESC key to close window (check globally, with debouncing)
+    if config.close_on_escape && config.show_main_window {
+        let esc_down = ui.is_key_down(Key::Escape);
+        let was_down = ESC_WAS_DOWN.with(|c| c.get());
+
+        if esc_down && !was_down {
+            config.show_main_window = false;
+        }
+
+        ESC_WAS_DOWN.with(|c| c.set(esc_down));
+    }
 
     if !config.show_main_window {
         return;
@@ -38,6 +66,9 @@ pub fn render_main_window(ui: &Ui) {
     // Cache tracked events for this frame (to avoid re-locking in tooltip handler)
     CACHED_TRACKED_EVENTS.with(|c| {
         *c.borrow_mut() = config.tracked_events.clone();
+    });
+    CACHED_ONESHOT_EVENTS.with(|c| {
+        *c.borrow_mut() = config.oneshot_events.clone();
     });
 
     // Cache copy setting for this frame
@@ -69,7 +100,6 @@ pub fn render_main_window(ui: &Ui) {
     let label_bg_color = config.label_column_bg_color;
     let label_text_color = config.label_column_text_color;
     let label_category_color = config.label_column_category_color;
-    let close_on_escape = config.close_on_escape;
 
     // Calculate time ONCE per frame
     let current_time = get_current_unix_time();
@@ -94,11 +124,6 @@ pub fn render_main_window(ui: &Ui) {
         .title_bar(false)
         .collapsible(false)
         .build(ui, || {
-            // Handle ESC key to close window
-            if close_on_escape && ui.is_key_pressed(Key::Escape) {
-                config.show_main_window = false;
-            }
-            
             // Check if we need to open the event tracking menu (set by tooltip handler)
             let should_open_event_menu = OPEN_EVENT_MENU.with(|f| {
                 let val = *f.borrow();
@@ -132,7 +157,8 @@ pub fn render_main_window(ui: &Ui) {
             // Event tracking context menu
             ui.popup("event_track_menu", || {
                 CONTEXT_EVENT.with(|e| {
-                    if let Some((track_name, event_name, was_tracked)) = e.borrow().clone() {
+                    if let Some((track_name, event_name, was_tracked, was_oneshot)) = e.borrow().clone() {
+                        // Track/Untrack option
                         let label = if was_tracked {
                             format!("Untrack: {}", event_name)
                         } else {
@@ -140,9 +166,32 @@ pub fn render_main_window(ui: &Ui) {
                         };
 
                         if MenuItem::new(&label).build(ui) {
-                            // Queue the toggle for next frame (avoids deadlock)
                             PENDING_TRACK_TOGGLE.with(|p| {
-                                *p.borrow_mut() = Some((track_name, event_name));
+                                *p.borrow_mut() = Some((track_name.clone(), event_name.clone(), false));
+                            });
+                        }
+
+                        // Track Next Only option (only show if not already tracked)
+                        if !was_tracked {
+                            let oneshot_label = if was_oneshot {
+                                format!("Cancel One-shot: {}", event_name)
+                            } else {
+                                format!("Track Next Only: {}", event_name)
+                            };
+
+                            if MenuItem::new(&oneshot_label).build(ui) {
+                                PENDING_TRACK_TOGGLE.with(|p| {
+                                    *p.borrow_mut() = Some((track_name.clone(), event_name.clone(), true));
+                                });
+                            }
+                        }
+
+                        ui.separator();
+
+                        // Open Wiki option
+                        if MenuItem::new(format!("Open Wiki: {}", event_name)).build(ui) {
+                            PENDING_WIKI_OPEN.with(|p| {
+                                *p.borrow_mut() = Some(event_name.clone());
                             });
                         }
                     }
@@ -155,7 +204,15 @@ pub fn render_main_window(ui: &Ui) {
                     LabelColumnPosition::Left => label_column_width,
                     _ => 0.0,
                 };
-                render_time_ruler(ui, current_time, view_range, time_position, label_offset);
+                render_time_ruler(
+                    ui,
+                    current_time,
+                    view_range,
+                    time_position,
+                    label_offset,
+                    config.time_ruler_interval,
+                    config.time_ruler_show_current_time,
+                );
             }
             
             let _style_token = ui.push_style_var(StyleVar::ItemSpacing([0.0, 0.0]));
@@ -1039,12 +1096,15 @@ fn handle_track_tooltip(
                 // Right-click to track/untrack event
                 if ui.is_mouse_clicked(MouseButton::Right) {
                     // Check tracked status from cached value (avoids deadlock)
+                    let event_id = TrackedEventId::new(&track.name, &event.name);
                     let is_tracked = CACHED_TRACKED_EVENTS.with(|c| {
-                        let event_id = TrackedEventId::new(&track.name, &event.name);
+                        c.borrow().contains(&event_id)
+                    });
+                    let is_oneshot = CACHED_ONESHOT_EVENTS.with(|c| {
                         c.borrow().contains(&event_id)
                     });
                     CONTEXT_EVENT.with(|e| {
-                        *e.borrow_mut() = Some((track.name.clone(), event.name.clone(), is_tracked));
+                        *e.borrow_mut() = Some((track.name.clone(), event.name.clone(), is_tracked, is_oneshot));
                     });
                     OPEN_EVENT_MENU.with(|f| {
                         *f.borrow_mut() = true;

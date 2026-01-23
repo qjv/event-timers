@@ -4,7 +4,7 @@ use nexus::imgui::{
 use std::collections::HashSet;
 use parking_lot::MutexGuard;
 
-use crate::config::{ToastPosition, TrackedEventId, RUNTIME_CONFIG, SELECTED_EVENT, SELECTED_TRACK, RuntimeConfig};
+use crate::config::{TimeRulerInterval, ToastPosition, TrackedEventId, RUNTIME_CONFIG, SELECTED_EVENT, SELECTED_TRACK, RuntimeConfig};
 use crate::json_loader::{load_tracks_from_json, EventColor, EventTrack, TimelineEvent};
 use crate::notifications::NOTIFICATION_STATE;
 
@@ -119,6 +119,23 @@ pub fn render_settings(ui: &Ui) {
         // --- Timeline ---
         ui.text("Timeline");
         ui.checkbox("Show Time Ruler", &mut config.show_time_ruler);
+
+        if config.show_time_ruler {
+            // Time ruler marker spacing
+            ui.text("Marker Spacing:");
+            ui.same_line();
+            for interval in TimeRulerInterval::all() {
+                if ui.radio_button(
+                    &format!("{}##interval", interval.label()),
+                    &mut config.time_ruler_interval,
+                    *interval,
+                ) {}
+                ui.same_line();
+            }
+            ui.new_line();
+
+            ui.checkbox("Show Current Time on Ruler", &mut config.time_ruler_show_current_time);
+        }
 
         let mut view_range_minutes = config.view_range_seconds / 60.0;
         if nexus::imgui::Slider::new("View Range (minutes)", 15.0, 120.0)
@@ -398,7 +415,11 @@ pub fn render_settings(ui: &Ui) {
                     {
                         let event_id = TrackedEventId::new(&track.name, &event.name);
                         let key = (track.name.clone(), event.name.clone());
-                        if !config.tracked_events.contains(&event_id) && !seen.contains(&key) {
+                        // Exclude already tracked or oneshot events
+                        if !config.tracked_events.contains(&event_id)
+                            && !config.oneshot_events.contains(&event_id)
+                            && !seen.contains(&key)
+                        {
                             seen.insert(key);
                             matches.push((track.name.clone(), event.name.clone()));
                         }
@@ -408,21 +429,72 @@ pub fn render_settings(ui: &Ui) {
 
             if !matches.is_empty() {
                 let mut to_track: Option<TrackedEventId> = None;
-                if let Some(_t) = ui.begin_table_with_flags("##search_results", 2, TableFlags::SIZING_STRETCH_PROP | TableFlags::ROW_BG) {
+                let mut to_oneshot: Option<TrackedEventId> = None;
+
+                let table_flags = TableFlags::SIZING_STRETCH_PROP | TableFlags::ROW_BG | TableFlags::PAD_OUTER_X;
+                if let Some(_t) = ui.begin_table_with_flags("##search_results", 4, table_flags) {
+                    ui.table_setup_column("Event");
+                    ui.table_setup_column_with(nexus::imgui::TableColumnSetup {
+                        name: "Track",
+                        flags: nexus::imgui::TableColumnFlags::WIDTH_FIXED,
+                        init_width_or_weight: 50.0,
+                        user_id: Default::default(),
+                    });
+                    ui.table_setup_column_with(nexus::imgui::TableColumnSetup {
+                        name: "##actions",
+                        flags: nexus::imgui::TableColumnFlags::WIDTH_FIXED,
+                        init_width_or_weight: 120.0,
+                        user_id: Default::default(),
+                    });
+                    ui.table_setup_column_with(nexus::imgui::TableColumnSetup {
+                        name: "##spacer",
+                        flags: nexus::imgui::TableColumnFlags::WIDTH_FIXED,
+                        init_width_or_weight: 5.0,
+                        user_id: Default::default(),
+                    });
+
                     for (track_name, event_name) in matches.iter().take(10) {
                         ui.table_next_row();
+
+                        // Event name
                         ui.table_next_column();
-                        if Selectable::new(&format!("{}##{}", event_name, track_name)).build(ui) {
-                            to_track = Some(TrackedEventId::new(track_name, event_name));
-                        }
+                        ui.text(event_name);
+
+                        // Track name
                         ui.table_next_column();
                         ui.text_disabled(track_name);
+
+                        // Action buttons
+                        ui.table_next_column();
+                        let _btn_color = ui.push_style_color(nexus::imgui::StyleColor::Button, [0.2, 0.5, 0.2, 0.8]);
+                        let _btn_hover = ui.push_style_color(nexus::imgui::StyleColor::ButtonHovered, [0.3, 0.7, 0.3, 1.0]);
+                        if ui.small_button(&format!("Track##{}{}", track_name, event_name)) {
+                            to_track = Some(TrackedEventId::new(track_name, event_name));
+                        }
+                        drop(_btn_color);
+                        drop(_btn_hover);
+
+                        ui.same_line();
+
+                        let _btn_color2 = ui.push_style_color(nexus::imgui::StyleColor::Button, [0.6, 0.4, 0.1, 0.8]);
+                        let _btn_hover2 = ui.push_style_color(nexus::imgui::StyleColor::ButtonHovered, [0.8, 0.5, 0.2, 1.0]);
+                        if ui.small_button(&format!("Next##{}{}", track_name, event_name)) {
+                            to_oneshot = Some(TrackedEventId::new(track_name, event_name));
+                        }
+
+                        ui.table_next_column();
                     }
                 }
+
                 if let Some(id) = to_track {
                     config.tracked_events.insert(id);
                     SEARCH_TEXT.with(|s| s.borrow_mut().clear());
                 }
+                if let Some(id) = to_oneshot {
+                    config.oneshot_events.insert(id);
+                    SEARCH_TEXT.with(|s| s.borrow_mut().clear());
+                }
+
                 if matches.len() > 10 {
                     ui.text_disabled(&format!("...{} more", matches.len() - 10));
                 }
@@ -432,46 +504,126 @@ pub fn render_settings(ui: &Ui) {
         }
 
         let tracked_count = config.tracked_events.len();
-        ui.text(&format!("{} tracked", tracked_count));
-        if tracked_count > 0 {
+        let oneshot_count = config.oneshot_events.len();
+
+        // Header with counts
+        ui.text_colored([0.4, 0.8, 1.0, 1.0], &format!("{} Tracked", tracked_count));
+        if oneshot_count > 0 {
+            ui.same_line();
+            ui.text_colored([1.0, 0.8, 0.4, 1.0], &format!(" + {} One-shot", oneshot_count));
+        }
+
+        if tracked_count > 0 || oneshot_count > 0 {
             ui.same_line();
             if ui.io().key_ctrl {
                 if ui.small_button("Clear All") {
                     config.tracked_events.clear();
+                    config.oneshot_events.clear();
                 }
             } else {
                 ui.text_disabled("[Ctrl to clear]");
             }
 
-            let tracked: Vec<TrackedEventId> = config.tracked_events.iter().cloned().collect();
-            let mut to_remove: Vec<TrackedEventId> = Vec::new();
+            // Build a lookup map for event colors
+            let mut event_colors: std::collections::HashMap<(String, String), [f32; 4]> = std::collections::HashMap::new();
+            for track in &config.tracks {
+                for event in &track.events {
+                    event_colors.insert(
+                        (track.name.clone(), event.name.clone()),
+                        event.color.to_array(),
+                    );
+                }
+            }
 
-            if let Some(_t) = ui.begin_table_with_flags("##tracked", 3, TableFlags::SIZING_STRETCH_PROP) {
+            // Combine tracked and oneshot events for display
+            let tracked: Vec<(TrackedEventId, bool)> = config.tracked_events.iter()
+                .map(|id| (id.clone(), false))
+                .chain(config.oneshot_events.iter().map(|id| (id.clone(), true)))
+                .collect();
+
+            let mut to_remove: Vec<(TrackedEventId, bool)> = Vec::new();
+
+            ui.spacing();
+
+            // Use a child region with some padding for better visual
+            let table_flags = TableFlags::SIZING_STRETCH_PROP
+                | TableFlags::ROW_BG
+                | TableFlags::BORDERS_INNER_H
+                | TableFlags::PAD_OUTER_X;
+
+            if let Some(_t) = ui.begin_table_with_flags("##tracked", 4, table_flags) {
+                ui.table_setup_column_with(nexus::imgui::TableColumnSetup {
+                    name: "##color",
+                    flags: nexus::imgui::TableColumnFlags::WIDTH_FIXED,
+                    init_width_or_weight: 8.0,
+                    user_id: Default::default(),
+                });
                 ui.table_setup_column("Event");
                 ui.table_setup_column("Track");
                 ui.table_setup_column_with(nexus::imgui::TableColumnSetup {
                     name: "##x",
                     flags: nexus::imgui::TableColumnFlags::WIDTH_FIXED,
-                    init_width_or_weight: 20.0,
+                    init_width_or_weight: 24.0,
                     user_id: Default::default(),
                 });
 
-                for event_id in &tracked {
+                for (event_id, is_oneshot) in &tracked {
                     ui.table_next_row();
+
+                    // Color indicator column
                     ui.table_next_column();
-                    ui.text(&event_id.event_name);
+                    let color = event_colors
+                        .get(&(event_id.track_name.clone(), event_id.event_name.clone()))
+                        .copied()
+                        .unwrap_or([0.5, 0.5, 0.5, 1.0]);
+
+                    let cursor_pos = ui.cursor_screen_pos();
+                    let draw_list = ui.get_window_draw_list();
+                    draw_list.add_rect(
+                        cursor_pos,
+                        [cursor_pos[0] + 6.0, cursor_pos[1] + 18.0],
+                        color,
+                    ).filled(true).build();
+                    ui.dummy([6.0, 18.0]);
+
+                    // Event name column
                     ui.table_next_column();
-                    ui.text_disabled(&event_id.track_name);
+                    ui.set_window_font_scale(1.1);
+                    if *is_oneshot {
+                        ui.text_colored([1.0, 0.8, 0.4, 1.0], &event_id.event_name);
+                    } else {
+                        ui.text_colored([1.0, 1.0, 1.0, 1.0], &event_id.event_name);
+                    }
+                    ui.set_window_font_scale(1.0);
+
+                    // Track name column
                     ui.table_next_column();
-                    if ui.small_button(&format!("X##{}{}", event_id.track_name, event_id.event_name)) {
-                        to_remove.push(event_id.clone());
+                    ui.text_colored([0.6, 0.6, 0.6, 1.0], &event_id.track_name);
+                    if *is_oneshot {
+                        ui.same_line();
+                        ui.text_colored([1.0, 0.6, 0.2, 0.8], "(next only)");
+                    }
+
+                    // Remove button column
+                    ui.table_next_column();
+                    let _btn_color = ui.push_style_color(nexus::imgui::StyleColor::Button, [0.6, 0.2, 0.2, 0.8]);
+                    let _btn_hover = ui.push_style_color(nexus::imgui::StyleColor::ButtonHovered, [0.8, 0.3, 0.3, 1.0]);
+                    if ui.small_button(&format!("X##{}{}{}", event_id.track_name, event_id.event_name, is_oneshot)) {
+                        to_remove.push((event_id.clone(), *is_oneshot));
                     }
                 }
             }
 
-            for id in to_remove {
-                config.tracked_events.remove(&id);
+            for (id, is_oneshot) in to_remove {
+                if is_oneshot {
+                    config.oneshot_events.remove(&id);
+                } else {
+                    config.tracked_events.remove(&id);
+                }
             }
+        } else {
+            ui.spacing();
+            ui.text_disabled("No events tracked. Right-click events in the timeline to track them.");
         }
 
         ui.unindent();

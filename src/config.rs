@@ -327,9 +327,18 @@ pub struct UserConfig {
     #[serde(default)]
     pub copy_with_event_name: bool,
 
+    // === Time Ruler Settings ===
+    #[serde(default)]
+    pub time_ruler_interval: TimeRulerInterval,
+    #[serde(default)]
+    pub time_ruler_show_current_time: bool,
+
     // === Notification Settings ===
     #[serde(default)]
     pub tracked_events: HashSet<TrackedEventId>,
+
+    #[serde(default)]
+    pub oneshot_events: HashSet<TrackedEventId>,
 
     #[serde(default)]
     pub notification_config: NotificationConfig,
@@ -350,6 +359,51 @@ fn default_view_range() -> f32 { 3600.0 }
 fn default_time_position() -> f32 { 0.5 }
 fn default_spacing_same_category() -> f32 { 0.0 }
 fn default_spacing_between_categories() -> f32 { 0.0 }
+
+/// Time ruler marker spacing options (in minutes)
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TimeRulerInterval {
+    Minutes5 = 5,
+    Minutes10 = 10,
+    Minutes15 = 15,
+    Minutes20 = 20,
+    Minutes30 = 30,
+    Minutes60 = 60,
+}
+
+impl Default for TimeRulerInterval {
+    fn default() -> Self {
+        Self::Minutes5
+    }
+}
+
+impl TimeRulerInterval {
+    pub fn as_seconds(&self) -> i64 {
+        (*self as i64) * 60
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Minutes5 => "5 min",
+            Self::Minutes10 => "10 min",
+            Self::Minutes15 => "15 min",
+            Self::Minutes20 => "20 min",
+            Self::Minutes30 => "30 min",
+            Self::Minutes60 => "60 min",
+        }
+    }
+
+    pub fn all() -> &'static [TimeRulerInterval] {
+        &[
+            Self::Minutes5,
+            Self::Minutes10,
+            Self::Minutes15,
+            Self::Minutes20,
+            Self::Minutes30,
+            Self::Minutes60,
+        ]
+    }
+}
 
 impl Default for UserConfig {
     fn default() -> Self {
@@ -388,7 +442,10 @@ impl Default for UserConfig {
             label_column_category_color: [0.8, 0.8, 0.2, 1.0],
             close_on_escape: true,
             copy_with_event_name: false,
+            time_ruler_interval: TimeRulerInterval::default(),
+            time_ruler_show_current_time: false,
             tracked_events: HashSet::new(),
+            oneshot_events: HashSet::new(),
             notification_config: NotificationConfig::default(),
         }
     }
@@ -433,8 +490,13 @@ pub struct RuntimeConfig {
     pub close_on_escape: bool,
     pub copy_with_event_name: bool,
 
+    // === Time Ruler Settings ===
+    pub time_ruler_interval: TimeRulerInterval,
+    pub time_ruler_show_current_time: bool,
+
     // === Notification Settings ===
     pub tracked_events: HashSet<TrackedEventId>,
+    pub oneshot_events: HashSet<TrackedEventId>,
     pub notification_config: NotificationConfig,
 }
 
@@ -476,7 +538,10 @@ impl Default for RuntimeConfig {
             label_column_category_color: [0.8, 0.8, 0.2, 1.0],
             close_on_escape: true,
             copy_with_event_name: false,
+            time_ruler_interval: TimeRulerInterval::default(),
+            time_ruler_show_current_time: false,
             tracked_events: HashSet::new(),
+            oneshot_events: HashSet::new(),
             notification_config: NotificationConfig::default(),
         }
     }
@@ -556,7 +621,10 @@ pub fn apply_user_overrides() {
                 user_cfg.label_column_category_color,
                 user_cfg.close_on_escape,
                 user_cfg.copy_with_event_name,
+                user_cfg.time_ruler_interval,
+                user_cfg.time_ruler_show_current_time,
                 user_cfg.tracked_events.clone(),
+                user_cfg.oneshot_events.clone(),
                 user_cfg.notification_config.clone(),
             )
         )
@@ -624,8 +692,11 @@ pub fn apply_user_overrides() {
         runtime.label_column_category_color = user_settings.30;
         runtime.close_on_escape = user_settings.31;
         runtime.copy_with_event_name = user_settings.32;
-        runtime.tracked_events = user_settings.33;
-        runtime.notification_config = user_settings.34;
+        runtime.time_ruler_interval = user_settings.33;
+        runtime.time_ruler_show_current_time = user_settings.34;
+        runtime.tracked_events = user_settings.35;
+        runtime.oneshot_events = user_settings.36;
+        runtime.notification_config = user_settings.37;
     } // runtime lock dropped here
 }
 
@@ -703,8 +774,11 @@ pub fn extract_user_overrides() {
     user_cfg.label_column_category_color = runtime.label_column_category_color;
     user_cfg.close_on_escape = runtime.close_on_escape;
     user_cfg.copy_with_event_name = runtime.copy_with_event_name;
+    user_cfg.time_ruler_interval = runtime.time_ruler_interval;
+    user_cfg.time_ruler_show_current_time = runtime.time_ruler_show_current_time;
     user_cfg.category_visibility = runtime.category_visibility.clone();
     user_cfg.tracked_events = runtime.tracked_events.clone();
+    user_cfg.oneshot_events = runtime.oneshot_events.clone();
     user_cfg.notification_config = runtime.notification_config.clone();
 }
 

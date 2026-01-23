@@ -41,6 +41,12 @@ fn calculate_toast_position(
     }
 }
 
+/// Result from rendering a toast: (clicked_to_copy, dismissed)
+struct ToastAction {
+    copy_clicked: bool,
+    dismissed: bool,
+}
+
 /// Render a single toast notification
 fn render_single_toast(
     ui: &Ui,
@@ -48,8 +54,11 @@ fn render_single_toast(
     position: [f32; 2],
     size: [f32; 2],
     config: &NotificationConfig,
-) -> bool {
-    let mut clicked = false;
+) -> ToastAction {
+    let mut action = ToastAction {
+        copy_clicked: false,
+        dismissed: false,
+    };
     let _alpha = ui.push_style_var(StyleVar::Alpha(toast.opacity));
     let _bg = ui.push_style_color(StyleColor::WindowBg, config.toast_bg_color);
 
@@ -67,6 +76,42 @@ fn render_single_toast(
         .build(ui, || {
             let scale = config.toast_text_scale;
 
+            // Draw X button in upper right corner
+            let draw_list = ui.get_window_draw_list();
+            let window_pos = ui.window_pos();
+            let button_size = 16.0 * scale;
+            let button_margin = 4.0;
+            let button_x = window_pos[0] + size[0] - button_size - button_margin;
+            let button_y = window_pos[1] + button_margin;
+
+            // Check if mouse is over the X button
+            let mouse_pos = ui.io().mouse_pos;
+            let over_x_button = mouse_pos[0] >= button_x
+                && mouse_pos[0] <= button_x + button_size
+                && mouse_pos[1] >= button_y
+                && mouse_pos[1] <= button_y + button_size;
+
+            // Draw X button background on hover
+            let x_color = if over_x_button {
+                [1.0, 0.4, 0.4, 1.0] // Red on hover
+            } else {
+                [0.6, 0.6, 0.6, 0.8] // Gray normally
+            };
+
+            // Draw X
+            let x_center = [button_x + button_size / 2.0, button_y + button_size / 2.0];
+            let x_half = button_size / 3.0;
+            draw_list.add_line(
+                [x_center[0] - x_half, x_center[1] - x_half],
+                [x_center[0] + x_half, x_center[1] + x_half],
+                x_color,
+            ).thickness(2.0).build();
+            draw_list.add_line(
+                [x_center[0] + x_half, x_center[1] - x_half],
+                [x_center[0] - x_half, x_center[1] + x_half],
+                x_color,
+            ).thickness(2.0).build();
+
             // Event name (title)
             ui.set_window_font_scale(scale);
             ui.text_colored(config.toast_title_color, &toast.event_id.event_name);
@@ -75,11 +120,16 @@ fn render_single_toast(
             ui.set_window_font_scale(scale * 0.85);
             ui.text_colored(config.toast_track_color, &toast.event_id.track_name);
 
-            // Reminder message and time remaining
+            // Reminder message and time info
             ui.set_window_font_scale(scale);
             let time_text = if toast.minutes_until > 0 {
+                // Upcoming event: show minutes until
                 format!("{} ({} min)", toast.reminder_name, toast.minutes_until)
+            } else if toast.minutes_until < 0 {
+                // Ongoing event: negative value means minutes ago
+                format!("{} ({}m ago)", toast.reminder_name, -toast.minutes_until)
             } else {
+                // Just started (minutes_until == 0)
                 format!("{} (now!)", toast.reminder_name)
             };
             ui.text_colored(toast.reminder_color, &time_text);
@@ -92,20 +142,24 @@ fn render_single_toast(
 
             ui.set_window_font_scale(1.0);
 
-            // Check for click
-            if ui.is_window_hovered() && ui.is_mouse_clicked(MouseButton::Left) {
-                clicked = true;
+            // Check for click on X button to dismiss
+            if over_x_button && ui.is_mouse_clicked(MouseButton::Left) {
+                action.dismissed = true;
+            }
+            // Check for click anywhere else to copy waypoint
+            else if ui.is_window_hovered() && ui.is_mouse_clicked(MouseButton::Left) {
+                action.copy_clicked = true;
             }
         });
 
-    clicked
+    action
 }
 
 /// Render toast notifications (call from main render loop)
 pub fn render_toast_notifications(ui: &Ui) {
-    let notification_config = {
+    let (notification_config, copy_with_event_name) = {
         let config = RUNTIME_CONFIG.lock();
-        config.notification_config.clone()
+        (config.notification_config.clone(), config.copy_with_event_name)
     };
 
     let toast_position = notification_config.toast_position;
@@ -122,9 +176,17 @@ pub fn render_toast_notifications(ui: &Ui) {
         if let Some(preview) = &state.preview_toast {
             let display_size = ui.io().display_size;
             let pos = calculate_toast_position(0, toast_position, toast_size, display_size, offset_x, offset_y);
-            let clicked = render_single_toast(ui, preview, pos, toast_size, &notification_config);
-            if clicked && !preview.copy_text.is_empty() {
-                ui.set_clipboard_text(&preview.copy_text);
+            let action = render_single_toast(ui, preview, pos, toast_size, &notification_config);
+            if action.copy_clicked && !preview.copy_text.is_empty() {
+                let copy_text = if copy_with_event_name {
+                    format!("{}: {}", preview.event_id.event_name, preview.copy_text)
+                } else {
+                    preview.copy_text.clone()
+                };
+                ui.set_clipboard_text(&copy_text);
+            }
+            if action.dismissed {
+                state.preview_toast = None;
             }
         }
     }
@@ -133,8 +195,9 @@ pub fn render_toast_notifications(ui: &Ui) {
         return;
     }
 
-    // Collect copy text for clicked toasts
+    // Collect actions from clicked toasts
     let mut copy_text_to_set: Option<String> = None;
+    let mut toasts_to_dismiss: Vec<u64> = Vec::new();
 
     {
         let state = NOTIFICATION_STATE.lock();
@@ -152,9 +215,17 @@ pub fn render_toast_notifications(ui: &Ui) {
                 offset_x,
                 offset_y,
             );
-            let clicked = render_single_toast(ui, toast, pos, toast_size, &notification_config);
-            if clicked && !toast.copy_text.is_empty() {
-                copy_text_to_set = Some(toast.copy_text.clone());
+            let action = render_single_toast(ui, toast, pos, toast_size, &notification_config);
+            if action.copy_clicked && !toast.copy_text.is_empty() {
+                let copy_text = if copy_with_event_name {
+                    format!("{}: {}", toast.event_id.event_name, toast.copy_text)
+                } else {
+                    toast.copy_text.clone()
+                };
+                copy_text_to_set = Some(copy_text);
+            }
+            if action.dismissed {
+                toasts_to_dismiss.push(toast.id);
             }
         }
     }
@@ -162,6 +233,16 @@ pub fn render_toast_notifications(ui: &Ui) {
     // Copy to clipboard outside of lock
     if let Some(text) = copy_text_to_set {
         ui.set_clipboard_text(&text);
+    }
+
+    // Dismiss toasts outside of render lock
+    if !toasts_to_dismiss.is_empty() {
+        let mut state = NOTIFICATION_STATE.lock();
+        for id in toasts_to_dismiss {
+            if let Some(toast) = state.toast_queue.iter_mut().find(|t| t.id == id) {
+                toast.dismissed = true;
+            }
+        }
     }
 }
 
@@ -189,6 +270,7 @@ pub fn render_upcoming_panel(ui: &Ui) {
     // Collect actions to perform outside of lock
     let mut copy_text_to_set: Option<String> = None;
     let mut event_to_untrack: Option<crate::config::TrackedEventId> = None;
+    let mut wiki_to_open: Option<String> = None;
 
     {
         let state = NOTIFICATION_STATE.lock();
@@ -296,7 +378,11 @@ pub fn render_upcoming_panel(ui: &Ui) {
                         ui.separator();
 
                         if MenuItem::new("Untrack Event").build(ui) {
-                            event_to_untrack = Some(event_id);
+                            event_to_untrack = Some(event_id.clone());
+                        }
+
+                        if MenuItem::new("Open Wiki").build(ui) {
+                            wiki_to_open = Some(event_id.event_name.clone());
                         }
                     }
                 });
@@ -319,6 +405,14 @@ pub fn render_upcoming_panel(ui: &Ui) {
     if let Some(event_id) = event_to_untrack {
         let mut config = RUNTIME_CONFIG.lock();
         config.tracked_events.remove(&event_id);
+        config.oneshot_events.remove(&event_id);
+    }
+
+    // Open wiki outside of lock
+    if let Some(event_name) = wiki_to_open {
+        let search_query = event_name.replace(' ', "+");
+        let url = format!("https://wiki.guildwars2.com/wiki/?search={}", search_query);
+        let _ = open::that(url);
     }
 }
 

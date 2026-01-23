@@ -1,9 +1,20 @@
 use nexus::imgui::Ui;
+use crate::config::TimeRulerInterval;
 use crate::time_utils::{calculate_tyria_time, format_time_only};
 
 /// Render the time ruler
 /// - `label_offset`: horizontal offset for the timeline portion (when labels are on the left)
-pub fn render_time_ruler(ui: &Ui, current_time: i64, view_range: f32, time_position: f32, label_offset: f32) {
+/// - `tick_interval`: interval between tick marks
+/// - `show_current_time`: whether to display the current time text on the ruler
+pub fn render_time_ruler(
+    ui: &Ui,
+    current_time: i64,
+    view_range: f32,
+    time_position: f32,
+    label_offset: f32,
+    tick_interval: TimeRulerInterval,
+    show_current_time: bool,
+) {
     let draw_list = ui.get_window_draw_list();
     let cursor_pos = ui.cursor_screen_pos();
     let available_width = ui.content_region_avail()[0];
@@ -21,21 +32,21 @@ pub fn render_time_ruler(ui: &Ui, current_time: i64, view_range: f32, time_posit
     )
     .filled(true)
     .build();
-    
-    // Tick every 5 real minutes
-    const TICK_INTERVAL: i64 = 300;
+
+    // Tick at configured interval
+    let tick_interval_seconds = tick_interval.as_seconds();
     let time_before_current = view_range * time_position;
     let time_after_current = view_range * (1.0 - time_position);
     let pixels_per_second = timeline_width / view_range;
 
     let start_time = current_time - time_before_current as i64;
-    let first_tick = ((start_time / TICK_INTERVAL) + 1) * TICK_INTERVAL;
+    let first_tick = ((start_time / tick_interval_seconds) + 1) * tick_interval_seconds;
 
-    // Calculate max iterations needed instead of fixed 50
-    let max_ticks = ((time_before_current + time_after_current) / TICK_INTERVAL as f32).ceil() as i64 + 1;
+    // Calculate max iterations needed
+    let max_ticks = ((time_before_current + time_after_current) / tick_interval_seconds as f32).ceil() as i64 + 1;
 
     for i in 0..max_ticks {
-        let tick_time = first_tick + (i * TICK_INTERVAL);
+        let tick_time = first_tick + (i * tick_interval_seconds);
         let offset_from_current = tick_time - current_time;
 
         if offset_from_current >= -time_before_current as i64 && offset_from_current <= time_after_current as i64 {
@@ -60,6 +71,22 @@ pub fn render_time_ruler(ui: &Ui, current_time: i64, view_range: f32, time_posit
     )
     .thickness(2.0)
     .build();
+
+    // Display current time text on the ruler if enabled
+    if show_current_time {
+        let time_text = format_time_only(current_time);
+        let text_size = ui.calc_text_size(&time_text);
+
+        // Position the text to the left of the current time line, or right if not enough space
+        let text_x = if current_time_x - text_size[0] - 5.0 >= timeline_start_x {
+            current_time_x - text_size[0] - 5.0
+        } else {
+            current_time_x + 5.0
+        };
+        let text_y = cursor_pos[1] + (ruler_height - text_size[1]) / 2.0;
+
+        draw_list.add_text([text_x, text_y], [1.0, 1.0, 1.0, 0.9], &time_text);
+    }
 
     ui.dummy([available_width, ruler_height]);
 
