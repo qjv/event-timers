@@ -1,4 +1,4 @@
-use crate::config::{TrackedEventId, RUNTIME_CONFIG};
+use crate::config::{mark_config_dirty, TrackedEventId, RUNTIME_CONFIG};
 use crate::json_loader::{EventTrack, TimelineEvent};
 use crate::notifications::{UpcomingEvent, NOTIFICATION_STATE};
 use crate::time_utils::get_current_unix_time;
@@ -261,6 +261,7 @@ pub fn toggle_event_tracking(track_name: &str, event_name: &str) {
     } else {
         config.tracked_events.insert(event_id);
     }
+    mark_config_dirty();
 }
 
 /// Toggle favorite highlight for an event
@@ -273,6 +274,7 @@ pub fn toggle_event_favorite(track_name: &str, event_name: &str) {
     } else {
         config.favorite_events.insert(event_id);
     }
+    mark_config_dirty();
 }
 
 /// Set tracking state for an event
@@ -285,6 +287,7 @@ pub fn set_event_tracking(track_name: &str, event_name: &str, tracked: bool) {
     } else {
         config.tracked_events.remove(&event_id);
     }
+    mark_config_dirty();
 }
 
 /// Toggle one-shot tracking for an event (track next occurrence only)
@@ -297,4 +300,5 @@ pub fn toggle_oneshot_tracking(track_name: &str, event_name: &str) {
     } else {
         config.oneshot_events.insert(event_id);
     }
+    mark_config_dirty();
 }

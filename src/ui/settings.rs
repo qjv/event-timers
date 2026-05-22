@@ -6,8 +6,8 @@ use parking_lot::MutexGuard;
 use std::collections::HashSet;
 
 use crate::config::{
-    load_user_config, RuntimeConfig, TimeRulerInterval, ToastPosition, TrackedEventId,
-    RUNTIME_CONFIG,
+    load_user_config, mark_config_dirty, reset_user_config_to_defaults, save_user_config_now,
+    RuntimeConfig, TimeRulerInterval, ToastPosition, TrackedEventId, RUNTIME_CONFIG,
     SELECTED_EVENT, SELECTED_TRACK,
 };
 use crate::json_loader::{load_tracks_from_json, EventColor, EventTrack, TimelineEvent};
@@ -68,7 +68,8 @@ pub fn check_for_event_tracks_update() {
 
                                     match std::fs::write(&path, github_content) {
                                         Ok(_) => {
-                                            // Apply updated tracks immediately in runtime state.
+                                            // Persist current settings before reloading track data.
+                                            save_user_config_now();
                                             load_user_config();
                                             nexus::log::log(
                                                 nexus::log::LogLevel::Info,
@@ -115,6 +116,10 @@ pub fn check_for_event_tracks_update() {
 }
 
 pub fn render_settings(ui: &Ui) {
+    // Never call save_user_config / apply_user_overrides while this guard is held — they lock
+    // RUNTIME_CONFIG again and will deadlock (freeze the game).
+    let mut pending_reset = false;
+
     let mut config = RUNTIME_CONFIG.lock();
 
     ui.text("Event Timers Settings");
@@ -826,19 +831,18 @@ pub fn render_settings(ui: &Ui) {
         ui.separator();
 
         // --- Visibility/Reorder Controls ---
-        thread_local! {
-            static SHOW_VISIBILITY: std::cell::Cell<bool> = std::cell::Cell::new(true);
-            static SHOW_REORDERING: std::cell::Cell<bool> = std::cell::Cell::new(false);
-        }
-
-        let mut show_vis = SHOW_VISIBILITY.get();
-        let mut show_reorder = SHOW_REORDERING.get();
-
-        ui.checkbox("Show Visibility", &mut show_vis);
-        SHOW_VISIBILITY.set(show_vis);
+        ui.checkbox(
+            "Show Visibility",
+            &mut config.show_track_visibility_controls,
+        );
         ui.same_line();
-        ui.checkbox("Show Reorder", &mut show_reorder);
-        SHOW_REORDERING.set(show_reorder);
+        ui.checkbox(
+            "Show Reorder",
+            &mut config.show_track_reorder_controls,
+        );
+
+        let show_vis = config.show_track_visibility_controls;
+        let show_reorder = config.show_track_reorder_controls;
 
         ui.separator();
 
@@ -1019,12 +1023,7 @@ pub fn render_settings(ui: &Ui) {
     ui.text_colored([1.0, 0.4, 0.4, 1.0], "Reset");
     if ui.io().key_ctrl {
         if ui.button("Reset All Settings") {
-            if let Some(path) = crate::config::get_user_config_path() {
-                if std::fs::remove_file(&path).is_ok() {
-                    *crate::config::USER_CONFIG.lock() = crate::config::UserConfig::default();
-                    crate::config::apply_user_overrides();
-                }
-            }
+            pending_reset = true;
         }
     } else {
         ui.text_disabled("[Hold Ctrl] Reset All Settings");
@@ -1032,6 +1031,13 @@ pub fn render_settings(ui: &Ui) {
 
     ui.separator();
     render_custom_track_editor(ui, &mut config);
+
+    mark_config_dirty();
+    drop(config);
+
+    if pending_reset {
+        reset_user_config_to_defaults();
+    }
 }
 
 fn render_custom_track_editor(ui: &Ui, config: &mut MutexGuard<RuntimeConfig>) {

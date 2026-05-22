@@ -7,6 +7,8 @@ use std::{
     fs,
     hash::Hash,
     path::PathBuf,
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use crate::json_loader::{load_tracks_from_json, EventTrack};
@@ -369,6 +371,10 @@ pub struct UserConfig {
     pub show_quick_access_icon: bool,
     #[serde(default)]
     pub setup_onboarding_seen: bool,
+    #[serde(default = "default_true")]
+    pub show_track_visibility_controls: bool,
+    #[serde(default)]
+    pub show_track_reorder_controls: bool,
 
     // === Time Ruler Settings ===
     #[serde(default)]
@@ -518,6 +524,8 @@ impl Default for UserConfig {
             copy_with_event_name: false,
             show_quick_access_icon: true,
             setup_onboarding_seen: false,
+            show_track_visibility_controls: true,
+            show_track_reorder_controls: false,
             time_ruler_interval: TimeRulerInterval::default(),
             time_ruler_show_current_time: false,
             tracked_events: HashSet::new(),
@@ -568,6 +576,8 @@ pub struct RuntimeConfig {
     pub copy_with_event_name: bool,
     pub show_quick_access_icon: bool,
     pub setup_onboarding_seen: bool,
+    pub show_track_visibility_controls: bool,
+    pub show_track_reorder_controls: bool,
 
     // === Time Ruler Settings ===
     pub time_ruler_interval: TimeRulerInterval,
@@ -620,6 +630,8 @@ impl Default for RuntimeConfig {
             copy_with_event_name: false,
             show_quick_access_icon: true,
             setup_onboarding_seen: false,
+            show_track_visibility_controls: true,
+            show_track_reorder_controls: false,
             time_ruler_interval: TimeRulerInterval::default(),
             time_ruler_show_current_time: false,
             tracked_events: HashSet::new(),
@@ -631,6 +643,40 @@ impl Default for RuntimeConfig {
 }
 
 // === Global State ===
+
+static CONFIG_DIRTY: AtomicBool = AtomicBool::new(false);
+static CONFIG_DIRTY_AT_MS: AtomicU64 = AtomicU64::new(0);
+const CONFIG_AUTOSAVE_DEBOUNCE_MS: u64 = 1500;
+
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Mark settings as changed so they are written to disk shortly.
+pub fn mark_config_dirty() {
+    CONFIG_DIRTY.store(true, Ordering::Relaxed);
+    CONFIG_DIRTY_AT_MS.store(now_ms(), Ordering::Relaxed);
+}
+
+/// Persist settings immediately (e.g. unload, before reloading track data).
+pub fn save_user_config_now() {
+    CONFIG_DIRTY.store(false, Ordering::Relaxed);
+    save_user_config();
+}
+
+/// Debounced autosave; call periodically from the background thread.
+pub fn tick_config_autosave() {
+    if !CONFIG_DIRTY.load(Ordering::Relaxed) {
+        return;
+    }
+    let elapsed = now_ms().saturating_sub(CONFIG_DIRTY_AT_MS.load(Ordering::Relaxed));
+    if elapsed >= CONFIG_AUTOSAVE_DEBOUNCE_MS {
+        save_user_config_now();
+    }
+}
 
 pub static RUNTIME_CONFIG: Lazy<Mutex<RuntimeConfig>> =
     Lazy::new(|| Mutex::new(RuntimeConfig::default()));
@@ -712,6 +758,8 @@ pub fn apply_user_overrides() {
                 user_cfg.oneshot_events.clone(),
                 user_cfg.notification_config.clone(),
                 user_cfg.setup_onboarding_seen,
+                user_cfg.show_track_visibility_controls,
+                user_cfg.show_track_reorder_controls,
             ),
         )
     }; // user_cfg lock dropped here
@@ -786,6 +834,8 @@ pub fn apply_user_overrides() {
         runtime.oneshot_events = user_settings.38;
         runtime.notification_config = user_settings.39;
         runtime.setup_onboarding_seen = user_settings.40;
+        runtime.show_track_visibility_controls = user_settings.41;
+        runtime.show_track_reorder_controls = user_settings.42;
     } // runtime lock dropped here
 }
 
@@ -865,6 +915,8 @@ pub fn extract_user_overrides() {
     user_cfg.copy_with_event_name = runtime.copy_with_event_name;
     user_cfg.show_quick_access_icon = runtime.show_quick_access_icon;
     user_cfg.setup_onboarding_seen = runtime.setup_onboarding_seen;
+    user_cfg.show_track_visibility_controls = runtime.show_track_visibility_controls;
+    user_cfg.show_track_reorder_controls = runtime.show_track_reorder_controls;
     user_cfg.time_ruler_interval = runtime.time_ruler_interval;
     user_cfg.time_ruler_show_current_time = runtime.time_ruler_show_current_time;
     user_cfg.category_visibility = runtime.category_visibility.clone();
@@ -884,10 +936,23 @@ pub fn load_user_config() {
     if let Some(path) = get_user_config_path() {
         if path.exists() {
             if let Ok(json_str) = fs::read_to_string(&path) {
-                if let Ok(loaded) = serde_json::from_str::<UserConfig>(&json_str) {
-                    *USER_CONFIG.lock() = loaded;
-                    apply_user_overrides();
-                    return;
+                match serde_json::from_str::<UserConfig>(&json_str) {
+                    Ok(loaded) => {
+                        *USER_CONFIG.lock() = loaded;
+                        apply_user_overrides();
+                        return;
+                    }
+                    Err(e) => {
+                        nexus::log::log(
+                            nexus::log::LogLevel::Warning,
+                            "Event Timers",
+                            &format!(
+                                "Failed to parse {}: {} — using defaults",
+                                path.display(),
+                                e
+                            ),
+                        );
+                    }
                 }
             }
         }
@@ -896,18 +961,53 @@ pub fn load_user_config() {
     apply_user_overrides();
 }
 
-pub fn save_user_config() {
-    extract_user_overrides();
-
+fn write_user_config_to_disk() {
     let user_cfg = USER_CONFIG.lock();
     if let Some(path) = get_user_config_path() {
         if let Some(dir) = path.parent() {
-            fs::create_dir_all(dir).ok();
+            if let Err(e) = fs::create_dir_all(dir) {
+                nexus::log::log(
+                    nexus::log::LogLevel::Warning,
+                    "Event Timers",
+                    &format!("Failed to create config directory: {}", e),
+                );
+                return;
+            }
         }
-        if let Ok(json_str) = serde_json::to_string_pretty(&*user_cfg) {
-            fs::write(&path, json_str).ok();
+        match serde_json::to_string_pretty(&*user_cfg) {
+            Ok(json_str) => {
+                if let Err(e) = fs::write(&path, json_str) {
+                    nexus::log::log(
+                        nexus::log::LogLevel::Warning,
+                        "Event Timers",
+                        &format!("Failed to write {}: {}", path.display(), e),
+                    );
+                }
+            }
+            Err(e) => {
+                nexus::log::log(
+                    nexus::log::LogLevel::Warning,
+                    "Event Timers",
+                    &format!("Failed to serialize user config: {}", e),
+                );
+            }
         }
     }
+}
+
+pub fn save_user_config() {
+    extract_user_overrides();
+    write_user_config_to_disk();
+}
+
+/// Reset on-disk and in-memory settings to defaults. Do not call while holding `RUNTIME_CONFIG`.
+pub fn reset_user_config_to_defaults() {
+    if let Some(path) = get_user_config_path() {
+        let _ = fs::remove_file(path);
+    }
+    *USER_CONFIG.lock() = UserConfig::default();
+    apply_user_overrides();
+    save_user_config_now();
 }
 
 pub fn get_track_visual_config(

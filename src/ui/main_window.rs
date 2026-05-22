@@ -1,4 +1,6 @@
-use crate::config::{get_track_visual_config, LabelColumnPosition, TextAlignment, RUNTIME_CONFIG};
+use crate::config::{
+    get_track_visual_config, mark_config_dirty, LabelColumnPosition, TextAlignment, RUNTIME_CONFIG,
+};
 use crate::json_loader::EventTrack;
 use crate::notification_logic::{
     toggle_event_favorite, toggle_event_tracking, toggle_oneshot_tracking,
@@ -157,16 +159,19 @@ pub fn render_main_window(ui: &Ui) {
                 let is_locked = config.is_window_locked;
                 if MenuItem::new("Lock Window").selected(is_locked).build(ui) {
                     config.is_window_locked = !is_locked;
+                    mark_config_dirty();
                 }
 
                 let hide_bg = config.hide_background;
                 if MenuItem::new("Hide Background").selected(hide_bg).build(ui) {
                     config.hide_background = !hide_bg;
+                    mark_config_dirty();
                 }
 
                 let show_sb = config.show_scrollbar;
                 if MenuItem::new("Show Scrollbar").selected(show_sb).build(ui) {
                     config.show_scrollbar = !show_sb;
+                    mark_config_dirty();
                 }
             });
 
@@ -240,6 +245,7 @@ pub fn render_main_window(ui: &Ui) {
                 ui.spacing();
                 if ui.button("Got it") {
                     config.setup_onboarding_seen = true;
+                    mark_config_dirty();
                     ui.close_current_popup();
                 }
             });
@@ -287,7 +293,6 @@ pub fn render_main_window(ui: &Ui) {
                         event_border_thickness,
                         header_alignment,
                         header_padding,
-                        false, // label_column_active = false
                     );
                 }
                 LabelColumnPosition::Left => {
@@ -387,7 +392,6 @@ fn render_timeline_content(
     event_border_thickness: f32,
     header_alignment: TextAlignment,
     header_padding: f32,
-    label_column_active: bool, // NEW PARAMETER
 ) {
     let mut rendered_categories: HashSet<String> = HashSet::new();
     let ordered_categories = config.category_order.clone();
@@ -420,7 +424,6 @@ fn render_timeline_content(
             event_border_thickness,
             header_alignment,
             header_padding,
-            label_column_active,
         );
     }
 
@@ -454,7 +457,6 @@ fn render_timeline_content(
                     event_border_thickness,
                     header_alignment,
                     header_padding,
-                    label_column_active,
                 );
             }
         }
@@ -534,7 +536,6 @@ fn render_with_label_column_left(
         event_border_thickness,
         header_alignment,
         header_padding,
-        true, // label_column_active = true
     );
 
     ui.columns(1, "", false); // Reset to single column
@@ -597,7 +598,6 @@ fn render_with_label_column_right(
         event_border_thickness,
         header_alignment,
         header_padding,
-        true, // label_column_active = true
     );
 
     ui.next_column();
@@ -739,36 +739,35 @@ fn render_label_column_for_category(
                 ui.dummy([0.0, spacing_between]);
             }
 
-            if show_headers && !category.is_empty() {
-                // Category header with same height as timeline header
+            if !category.is_empty() {
                 let cursor_pos = ui.cursor_screen_pos();
                 let available_width = ui.content_region_avail()[0];
                 let text_size = ui.calc_text_size(category);
                 let header_height = text_size[1] + 10.0;
+                let needs_header_row = show_headers || label_show_category;
 
-                // Background for category (if enabled)
-                if label_bg_color[3] > 0.0 {
-                    draw_list
-                        .add_rect(
-                            cursor_pos,
-                            [
-                                cursor_pos[0] + available_width,
-                                cursor_pos[1] + header_height,
-                            ],
-                            label_bg_color,
-                        )
-                        .filled(true)
-                        .build();
+                if needs_header_row {
+                    if label_bg_color[3] > 0.0 {
+                        draw_list
+                            .add_rect(
+                                cursor_pos,
+                                [
+                                    cursor_pos[0] + available_width,
+                                    cursor_pos[1] + header_height,
+                                ],
+                                label_bg_color,
+                            )
+                            .filled(true)
+                            .build();
+                    }
+
+                    if label_show_category {
+                        let text_pos = [cursor_pos[0] + 5.0, cursor_pos[1] + 5.0];
+                        draw_list.add_text(text_pos, label_category_color, category);
+                    }
+
+                    ui.dummy([0.0, header_height]);
                 }
-
-                // Category text (if enabled) - uses separate category color
-                if label_show_category {
-                    // Note: Font scaling in nexus imgui is limited, using regular text
-                    let text_pos = [cursor_pos[0] + 5.0, cursor_pos[1] + 5.0];
-                    draw_list.add_text(text_pos, label_category_color, category);
-                }
-
-                ui.dummy([0.0, header_height]);
             }
 
             first_visible_in_category = false;
@@ -841,7 +840,6 @@ fn render_tracks_for_category(
     event_border_thickness: f32,
     header_alignment: TextAlignment,
     header_padding: f32,
-    label_column_active: bool, // NEW PARAMETER
 ) {
     if rendered_categories.contains(category) {
         return;
@@ -866,14 +864,8 @@ fn render_tracks_for_category(
                 ui.dummy([0.0, spacing_between]);
             }
 
-            // Only show header if label column is NOT active
-            if show_headers && !category.is_empty() && !label_column_active {
+            if show_headers && !category.is_empty() {
                 render_category_header(ui, category, header_alignment, header_padding);
-            } else if show_headers && !category.is_empty() && label_column_active {
-                // Just add spacing to match the label column's category header height
-                let text_size = ui.calc_text_size(category);
-                let header_height = text_size[1] + 10.0;
-                ui.dummy([0.0, header_height]);
             }
 
             first_visible_in_category = false;

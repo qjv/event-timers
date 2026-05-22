@@ -1,6 +1,6 @@
 use nexus::imgui::{Condition, MenuItem, MouseButton, StyleColor, StyleVar, Ui, Window, WindowFlags};
 
-use crate::config::{NotificationConfig, ToastPosition, RUNTIME_CONFIG};
+use crate::config::{mark_config_dirty, NotificationConfig, ToastPosition, RUNTIME_CONFIG};
 use crate::notifications::{ToastNotification, NOTIFICATION_STATE};
 use crate::time_utils::format_time_only;
 
@@ -420,6 +420,7 @@ pub fn render_upcoming_panel(ui: &Ui) {
         let mut config = RUNTIME_CONFIG.lock();
         config.tracked_events.remove(&event_id);
         config.oneshot_events.remove(&event_id);
+        mark_config_dirty();
     }
 
     // Open wiki outside of lock
