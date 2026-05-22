@@ -21,7 +21,10 @@ mod notifications;
 mod time_utils;
 mod ui;
 
-use config::{load_user_config, save_user_config, RUNTIME_CONFIG};
+use config::{
+    load_user_config, mark_config_dirty, save_user_config_now, tick_config_autosave,
+    RUNTIME_CONFIG,
+};
 use notification_logic::update_notifications;
 use ui::{
     check_for_event_tracks_update, render_main_window, render_settings,
@@ -41,6 +44,7 @@ extern "C-unwind" fn toggle_window_keybind(_identifier: *const c_char, is_releas
     if !is_release {
         let mut config = RUNTIME_CONFIG.lock();
         config.show_main_window = !config.show_main_window;
+        mark_config_dirty();
     }
 }
 
@@ -48,13 +52,16 @@ extern "C-unwind" fn toggle_toasts_keybind(_identifier: *const c_char, is_releas
     if !is_release {
         let mut config = RUNTIME_CONFIG.lock();
         config.notification_config.toast_enabled = !config.notification_config.toast_enabled;
+        mark_config_dirty();
     }
 }
 
 extern "C-unwind" fn toggle_upcoming_panel_keybind(_identifier: *const c_char, is_release: bool) {
     if !is_release {
         let mut config = RUNTIME_CONFIG.lock();
-        config.notification_config.upcoming_panel_enabled = !config.notification_config.upcoming_panel_enabled;
+        config.notification_config.upcoming_panel_enabled =
+            !config.notification_config.upcoming_panel_enabled;
+        mark_config_dirty();
     }
 }
 
@@ -137,6 +144,7 @@ fn load() {
                 } else {
                     NOTIFICATION_TICK_IDLE_MS
                 };
+                tick_config_autosave();
                 thread::sleep(Duration::from_millis(sleep_ms));
             }
         });
@@ -166,5 +174,5 @@ fn unload() {
     if let Some(h) = BG_THREAD.lock().take() {
         let _ = h.join();
     }
-    save_user_config();
+    save_user_config_now();
 }
