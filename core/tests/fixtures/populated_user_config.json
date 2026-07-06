@@ -1,0 +1,118 @@
+{
+  "track_overrides": {
+    "World Bosses": {
+      "visible": false,
+      "height": 60.0,
+      "disabled_events": ["Shadow Behemoth"],
+      "visual": {
+        "background_color": [0.1, 0.2, 0.3, 0.9],
+        "padding": 2.0
+      }
+    },
+    "Hard World Bosses": {
+      "height": 55.0
+    }
+  },
+  "custom_tracks": [
+    {
+      "name": "My Track",
+      "timeline_type": "game_time",
+      "events": [
+        {
+          "name": "My Event",
+          "start_offset": 600,
+          "duration": 900,
+          "cycle_duration": 7200,
+          "color": { "r": 0.9, "g": 0.1, "b": 0.4, "a": 1.0 },
+          "copy_text": "[&BEgAAAA=]",
+          "enabled": true
+        }
+      ],
+      "base_time": 1759262400,
+      "visible": true,
+      "height": 45.0,
+      "category": "Custom"
+    }
+  ],
+  "category_visibility": {
+    "Core Tyria": true,
+    "Custom": false
+  },
+  "show_main_window": true,
+  "is_window_locked": true,
+  "hide_background": true,
+  "show_time_ruler": false,
+  "show_scrollbar": false,
+  "timeline_width": 1024.0,
+  "view_range_seconds": 5400.0,
+  "current_time_position": 0.25,
+  "show_category_headers": true,
+  "spacing_same_category": 4.0,
+  "spacing_between_categories": 12.0,
+  "category_order": ["Core Tyria", "Custom"],
+  "global_track_background": [0.15, 0.15, 0.15, 0.5],
+  "global_track_padding": 3.0,
+  "override_all_track_heights": true,
+  "global_track_height": 32.0,
+  "draw_event_borders": false,
+  "event_border_color": [0.2, 0.2, 0.2, 1.0],
+  "event_border_thickness": 2.0,
+  "category_header_alignment": "Left",
+  "category_header_padding": 8.0,
+  "label_column_position": "Left",
+  "label_column_width": 180.0,
+  "label_column_show_category": true,
+  "label_column_show_track": false,
+  "label_column_text_size": 1.2,
+  "label_column_bg_color": [0.05, 0.05, 0.05, 0.8],
+  "label_column_text_color": [0.9, 0.9, 0.9, 1.0],
+  "label_column_category_color": [0.9, 0.7, 0.1, 1.0],
+  "close_on_escape": false,
+  "copy_with_event_name": true,
+  "show_quick_access_icon": false,
+  "setup_onboarding_seen": true,
+  "time_ruler_interval": "Minutes15",
+  "time_ruler_show_current_time": true,
+  "tracked_events": [
+    { "track_name": "World Bosses", "event_name": "Tequatl the Sunless" },
+    { "track_name": "World Bosses", "event_name": "Karka Queen" }
+  ],
+  "favorite_events": [
+    { "track_name": "World Bosses", "event_name": "Tequatl the Sunless" }
+  ],
+  "oneshot_events": [
+    { "track_name": "Hard World Bosses", "event_name": "Triple Trouble" }
+  ],
+  "notification_config": {
+    "toast_enabled": false,
+    "upcoming_panel_enabled": true,
+    "reminders": [
+      {
+        "name": "Heads up!",
+        "minutes_before": 15,
+        "text_color": [0.5, 0.8, 1.0, 1.0],
+        "ongoing_interval_minutes": 5
+      },
+      {
+        "name": "Now!",
+        "minutes_before": 0,
+        "text_color": [0.5, 1.0, 0.5, 1.0],
+        "ongoing_interval_minutes": 3
+      }
+    ],
+    "toast_duration_seconds": 8.0,
+    "max_visible_toasts": 5,
+    "upcoming_panel_size": [350.0, 250.0],
+    "max_upcoming_events": 15,
+    "toast_position": "BottomLeft",
+    "toast_size": [320.0, 90.0],
+    "toast_offset_x": 0.1,
+    "toast_offset_y": 0.05,
+    "toast_bg_color": [0.1, 0.1, 0.1, 0.95],
+    "toast_text_scale": 1.5,
+    "toast_title_color": [1.0, 0.8, 0.2, 1.0],
+    "toast_time_color": [0.5, 1.0, 0.5, 1.0],
+    "toast_track_color": [0.7, 0.7, 0.7, 1.0],
+    "happening_now_grace_minutes": 20
+  }
+}

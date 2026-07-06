@@ -1,3 +1,6 @@
+[workspace]
+members = [".", "core"]
+
 [package]
 name = "event_timers"
 version = "1.1.5"
@@ -6,6 +9,7 @@ authors = ["hvaren"]
 description = "Event timers port to Nexus, based on the wiki page of same name."
 
 [dependencies]
+event_timers_core = { path = "core" }
 nexus = { git = "https://github.com/zerthox/nexus-rs" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

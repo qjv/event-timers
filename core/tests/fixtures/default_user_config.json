@@ -1,0 +1,147 @@
+{
+  "track_overrides": {},
+  "custom_tracks": [],
+  "category_visibility": {},
+  "show_main_window": false,
+  "is_window_locked": false,
+  "hide_background": false,
+  "show_time_ruler": true,
+  "show_scrollbar": true,
+  "timeline_width": 800.0,
+  "view_range_seconds": 3600.0,
+  "current_time_position": 0.5,
+  "show_category_headers": false,
+  "spacing_same_category": 0.0,
+  "spacing_between_categories": 0.0,
+  "category_order": [],
+  "global_track_background": [
+    0.2,
+    0.2,
+    0.2,
+    0.2
+  ],
+  "global_track_padding": 0.0,
+  "override_all_track_heights": false,
+  "global_track_height": 40.0,
+  "draw_event_borders": true,
+  "event_border_color": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+  ],
+  "event_border_thickness": 1.0,
+  "category_header_alignment": "Center",
+  "category_header_padding": 0.0,
+  "label_column_position": "None",
+  "label_column_width": 150.0,
+  "label_column_show_category": false,
+  "label_column_show_track": true,
+  "label_column_text_size": 1.0,
+  "label_column_bg_color": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "label_column_text_color": [
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "label_column_category_color": [
+    0.8,
+    0.8,
+    0.2,
+    1.0
+  ],
+  "close_on_escape": true,
+  "copy_with_event_name": false,
+  "show_quick_access_icon": true,
+  "setup_onboarding_seen": false,
+  "time_ruler_interval": "Minutes5",
+  "time_ruler_show_current_time": false,
+  "tracked_events": [],
+  "favorite_events": [],
+  "oneshot_events": [],
+  "notification_config": {
+    "toast_enabled": true,
+    "upcoming_panel_enabled": false,
+    "reminders": [
+      {
+        "name": "Heads up!",
+        "minutes_before": 10,
+        "text_color": [
+          0.5,
+          0.8,
+          1.0,
+          1.0
+        ],
+        "ongoing_interval_minutes": 5
+      },
+      {
+        "name": "Starting soon!",
+        "minutes_before": 5,
+        "text_color": [
+          1.0,
+          0.8,
+          0.2,
+          1.0
+        ],
+        "ongoing_interval_minutes": 5
+      },
+      {
+        "name": "Happening now!",
+        "minutes_before": 0,
+        "text_color": [
+          0.5,
+          1.0,
+          0.5,
+          1.0
+        ],
+        "ongoing_interval_minutes": 5
+      }
+    ],
+    "toast_duration_seconds": 5.0,
+    "max_visible_toasts": 3,
+    "upcoming_panel_size": [
+      300.0,
+      200.0
+    ],
+    "max_upcoming_events": 10,
+    "toast_position": "TopRight",
+    "toast_size": [
+      280.0,
+      80.0
+    ],
+    "toast_offset_x": 0.0,
+    "toast_offset_y": 0.0,
+    "toast_bg_color": [
+      0.1,
+      0.1,
+      0.1,
+      0.95
+    ],
+    "toast_text_scale": 1.2,
+    "toast_title_color": [
+      1.0,
+      0.8,
+      0.2,
+      1.0
+    ],
+    "toast_time_color": [
+      0.5,
+      1.0,
+      0.5,
+      1.0
+    ],
+    "toast_track_color": [
+      0.7,
+      0.7,
+      0.7,
+      1.0
+    ],
+    "happening_now_grace_minutes": 10
+  }
+}
