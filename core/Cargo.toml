@@ -1,0 +1,11 @@
+[package]
+name = "event_timers_core"
+version = "0.1.0"
+edition = "2021"
+description = "Platform-independent data types for the event-timers addon. No nexus/windows dependencies, so tests run natively."
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1.0"

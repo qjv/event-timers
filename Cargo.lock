@@ -167,6 +167,7 @@ dependencies = [
 name = "event_timers"
 version = "1.1.5"
 dependencies = [
+ "event_timers_core",
  "libc",
  "nexus",
  "once_cell",
@@ -176,6 +177,14 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "event_timers_core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
