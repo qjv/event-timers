@@ -159,7 +159,7 @@ fn render_single_toast(
 pub fn render_toast_notifications(ui: &Ui) {
     let (notification_config, copy_with_event_name) = {
         let config = RUNTIME_CONFIG.lock();
-        (config.notification_config.clone(), config.copy_with_event_name)
+        (config.settings.notification_config.clone(), config.settings.copy_with_event_name)
     };
 
     if !notification_config.toast_enabled {
@@ -271,9 +271,9 @@ pub fn render_upcoming_panel(ui: &Ui) {
     let (panel_enabled, panel_size, copy_with_event_name) = {
         let config = RUNTIME_CONFIG.lock();
         (
-            config.notification_config.upcoming_panel_enabled,
-            config.notification_config.upcoming_panel_size,
-            config.copy_with_event_name,
+            config.settings.notification_config.upcoming_panel_enabled,
+            config.settings.notification_config.upcoming_panel_size,
+            config.settings.copy_with_event_name,
         )
     };
 
@@ -406,7 +406,7 @@ pub fn render_upcoming_panel(ui: &Ui) {
         if !opened {
             drop(state); // Release state lock first
             let mut config = RUNTIME_CONFIG.lock();
-            config.notification_config.upcoming_panel_enabled = false;
+            config.settings.notification_config.upcoming_panel_enabled = false;
         }
     }
 
@@ -418,8 +418,8 @@ pub fn render_upcoming_panel(ui: &Ui) {
     // Untrack event outside of lock
     if let Some(event_id) = event_to_untrack {
         let mut config = RUNTIME_CONFIG.lock();
-        config.tracked_events.remove(&event_id);
-        config.oneshot_events.remove(&event_id);
+        config.settings.tracked_events.remove(&event_id);
+        config.settings.oneshot_events.remove(&event_id);
     }
 
     // Open wiki outside of lock

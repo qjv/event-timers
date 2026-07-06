@@ -1,102 +1,13 @@
 use nexus::paths::get_addon_dir;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+
+// The track data types live in the nexus-free core crate so their tests can
+// run natively; re-export them so `crate::json_loader::X` paths keep working.
+pub use event_timers_core::tracks::{EventColor, EventTrack, TimelineEvent, TimelineType};
 
 // Embedded fallback JSON
 const EMBEDDED_JSON: &str = include_str!("../event_tracks.json");
-
-// === Public Data Structures ===
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct EventColor {
-    pub r: f32,
-    pub g: f32,
-    pub b: f32,
-    pub a: f32,
-}
-
-impl Default for EventColor {
-    fn default() -> Self {
-        Self { r: 0.2, g: 0.6, b: 0.8, a: 1.0 }
-    }
-}
-
-impl EventColor {
-    pub fn to_array(&self) -> [f32; 4] {
-        [self.r, self.g, self.b, self.a]
-    }
-    
-    pub fn from_array(arr: [f32; 4]) -> Self {
-        Self { r: arr[0], g: arr[1], b: arr[2], a: arr[3] }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum TimelineType {
-    #[serde(rename = "real_time")]
-    RealTime,
-    #[serde(rename = "game_time")]
-    GameTime,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TimelineEvent {
-    pub name: String,
-    pub start_offset: i64,
-    pub duration: i64,
-    pub cycle_duration: i64,
-    pub color: EventColor,
-    #[serde(default)]
-    pub copy_text: String,
-    #[serde(default = "default_true")]
-    pub enabled: bool,
-}
-
-fn default_true() -> bool { true }
-
-impl Default for TimelineEvent {
-    fn default() -> Self {
-        Self {
-            name: "New Event".to_string(),
-            start_offset: 0,
-            duration: 300,
-            cycle_duration: 7200,
-            color: EventColor::default(),
-            copy_text: String::new(),
-            enabled: true,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct EventTrack {
-    pub name: String,
-    pub timeline_type: TimelineType,
-    pub events: Vec<TimelineEvent>,
-    pub base_time: i64,
-    #[serde(default = "default_true")]
-    pub visible: bool,
-    #[serde(default = "default_height")]
-    pub height: f32,
-    #[serde(default)]
-    pub category: String,
-}
-
-fn default_height() -> f32 { 40.0 }
-
-impl Default for EventTrack {
-    fn default() -> Self {
-        Self {
-            name: "New Track".to_string(),
-            timeline_type: TimelineType::GameTime,
-            events: Vec::new(),
-            base_time: 0,
-            visible: true,
-            height: 40.0,
-            category: String::new(),
-        }
-    }
-}
 
 // === JSON File Structures ===
 
@@ -111,6 +22,9 @@ struct JsonSchedule {
     #[serde(default)]
     copy_text: String,
 }
+
+fn default_true() -> bool { true }
+fn default_height() -> f32 { 40.0 }
 
 #[derive(Deserialize, Debug)]
 struct JsonTrack {
@@ -149,15 +63,15 @@ fn calculate_tyria_base_time() -> i64 {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs() as i64;
-    
+
     // Reference: 2025-09-30 17:00:00 UTC-3 = Tyrian 00:00
     let reference_time: i64 = 1759262400;
     let cycle_duration = 120 * 60; // 120 minutes in seconds
-    
+
     let time_since_reference = current_time - reference_time;
     let cycles_elapsed = time_since_reference / cycle_duration;
     let current_cycle_start = reference_time + (cycles_elapsed * cycle_duration);
-    
+
     current_cycle_start
 }
 
@@ -207,7 +121,7 @@ fn expand_schedule(schedule: &JsonSchedule, cycle_minutes: i32) -> Vec<TimelineE
             enabled: true,
         }];
     }
-    
+
     // Repeating event
     let repetitions = cycle_minutes / schedule.interval;
     (0..repetitions)
@@ -247,7 +161,7 @@ fn extract_embedded_json() {
 fn load_json_content() -> String {
     // First, ensure embedded JSON is extracted
     extract_embedded_json();
-    
+
     if let Some(path) = get_json_path() {
         if path.exists() {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -255,27 +169,27 @@ fn load_json_content() -> String {
             }
         }
     }
-    
+
     // Fallback to embedded JSON
     EMBEDDED_JSON.to_string()
 }
 
 pub fn load_tracks_from_json() -> (Vec<EventTrack>, Vec<String>) {
     let json_content = load_json_content();
-    
+
     match serde_json::from_str::<JsonRoot>(&json_content) {
         Ok(root) => {
             let mut all_tracks = Vec::new();
             let mut category_names = Vec::new();
-            
+
             for category in root.categories {
                 category_names.push(category.name.clone());
-                
+
                 for json_track in category.tracks {
                     let base_time = get_base_time_from_calculator(&json_track.base_time_calculator);
-                    
+
                     let mut events = json_track.events;
-                    
+
                     // Expand schedules into events
                     for schedule in &json_track.schedules {
                         let cycle_minutes = match json_track.base_time_calculator.as_str() {
@@ -285,7 +199,7 @@ pub fn load_tracks_from_json() -> (Vec<EventTrack>, Vec<String>) {
                         };
                         events.extend(expand_schedule(schedule, cycle_minutes));
                     }
-                    
+
                     all_tracks.push(EventTrack {
                         name: json_track.name,
                         timeline_type: json_track.timeline_type,
@@ -297,7 +211,7 @@ pub fn load_tracks_from_json() -> (Vec<EventTrack>, Vec<String>) {
                     });
                 }
             }
-            
+
             (all_tracks, category_names)
         }
         Err(e) => {

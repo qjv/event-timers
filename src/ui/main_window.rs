@@ -57,61 +57,61 @@ pub fn render_main_window(ui: &Ui) {
     let mut config = RUNTIME_CONFIG.lock();
 
     // Handle ESC key to close window (check globally, with debouncing)
-    if config.close_on_escape && config.show_main_window {
+    if config.settings.close_on_escape && config.settings.show_main_window {
         let esc_down = ui.is_key_down(Key::Escape);
         let was_down = ESC_WAS_DOWN.with(|c| c.get());
 
         if esc_down && !was_down {
-            config.show_main_window = false;
+            config.settings.show_main_window = false;
         }
 
         ESC_WAS_DOWN.with(|c| c.set(esc_down));
     }
 
-    if !config.show_main_window {
+    if !config.settings.show_main_window {
         return;
     }
 
     // Cache tracked/favorite state for this frame in a lookup map.
     CACHED_TRACKED_BY_TRACK.with(|c| {
-        *c.borrow_mut() = to_track_event_map(&config.tracked_events);
+        *c.borrow_mut() = to_track_event_map(&config.settings.tracked_events);
     });
     CACHED_ONESHOT_BY_TRACK.with(|c| {
-        *c.borrow_mut() = to_track_event_map(&config.oneshot_events);
+        *c.borrow_mut() = to_track_event_map(&config.settings.oneshot_events);
     });
     CACHED_FAVORITE_BY_TRACK.with(|c| {
-        *c.borrow_mut() = to_track_event_map(&config.favorite_events);
+        *c.borrow_mut() = to_track_event_map(&config.settings.favorite_events);
     });
 
     // Cache copy setting for this frame
     CACHED_COPY_WITH_EVENT_NAME.with(|c| {
-        c.set(config.copy_with_event_name);
+        c.set(config.settings.copy_with_event_name);
     });
 
     // Cache all config values ONCE at start
-    let view_range = config.view_range_seconds;
-    let timeline_width = config.timeline_width;
-    let time_position = config.current_time_position;
-    let show_headers = config.show_category_headers;
-    let spacing_same = config.spacing_same_category;
-    let spacing_between = config.spacing_between_categories;
-    let global_bg = config.global_track_background;
-    let global_padding = config.global_track_padding;
-    let override_all_track_heights = config.override_all_track_heights;
-    let global_track_height = config.global_track_height;
-    let draw_event_borders = config.draw_event_borders;
-    let event_border_color = config.event_border_color;
-    let event_border_thickness = config.event_border_thickness;
-    let header_alignment = config.category_header_alignment;
-    let header_padding = config.category_header_padding;
-    let label_column_pos = config.label_column_position;
-    let label_column_width = config.label_column_width;
-    let label_show_category = config.label_column_show_category;
-    let label_show_track = config.label_column_show_track;
-    let label_text_size = config.label_column_text_size;
-    let label_bg_color = config.label_column_bg_color;
-    let label_text_color = config.label_column_text_color;
-    let label_category_color = config.label_column_category_color;
+    let view_range = config.settings.view_range_seconds;
+    let timeline_width = config.settings.timeline_width;
+    let time_position = config.settings.current_time_position;
+    let show_headers = config.settings.show_category_headers;
+    let spacing_same = config.settings.spacing_same_category;
+    let spacing_between = config.settings.spacing_between_categories;
+    let global_bg = config.settings.global_track_background;
+    let global_padding = config.settings.global_track_padding;
+    let override_all_track_heights = config.settings.override_all_track_heights;
+    let global_track_height = config.settings.global_track_height;
+    let draw_event_borders = config.settings.draw_event_borders;
+    let event_border_color = config.settings.event_border_color;
+    let event_border_thickness = config.settings.event_border_thickness;
+    let header_alignment = config.settings.category_header_alignment;
+    let header_padding = config.settings.category_header_padding;
+    let label_column_pos = config.settings.label_column_position;
+    let label_column_width = config.settings.label_column_width;
+    let label_show_category = config.settings.label_column_show_category;
+    let label_show_track = config.settings.label_column_show_track;
+    let label_text_size = config.settings.label_column_text_size;
+    let label_bg_color = config.settings.label_column_bg_color;
+    let label_text_color = config.settings.label_column_text_color;
+    let label_category_color = config.settings.label_column_category_color;
 
     // Calculate time ONCE per frame
     let current_time = get_current_unix_time();
@@ -119,19 +119,19 @@ pub fn render_main_window(ui: &Ui) {
     let time_after_current = view_range * (1.0 - time_position);
 
     let mut window_flags = WindowFlags::empty();
-    if config.is_window_locked {
+    if config.settings.is_window_locked {
         window_flags |= WindowFlags::NO_RESIZE | WindowFlags::NO_MOVE;
     }
 
     let mut window = Window::new("Event Timers");
-    if config.is_window_locked {
+    if config.settings.is_window_locked {
         window = window.title_bar(false);
     }
 
     window
         .flags(window_flags)
-        .draw_background(!config.hide_background)
-        .scroll_bar(config.show_scrollbar)
+        .draw_background(!config.settings.hide_background)
+        .scroll_bar(config.settings.show_scrollbar)
         .size([timeline_width, 600.0], Condition::FirstUseEver)
         .title_bar(false)
         .collapsible(false)
@@ -149,24 +149,24 @@ pub fn render_main_window(ui: &Ui) {
                 ui.open_popup("window_context_menu");
             }
 
-            if !config.setup_onboarding_seen {
+            if !config.settings.setup_onboarding_seen {
                 ui.open_popup("event_timers_onboarding");
             }
 
             ui.popup("window_context_menu", || {
-                let is_locked = config.is_window_locked;
+                let is_locked = config.settings.is_window_locked;
                 if MenuItem::new("Lock Window").selected(is_locked).build(ui) {
-                    config.is_window_locked = !is_locked;
+                    config.settings.is_window_locked = !is_locked;
                 }
 
-                let hide_bg = config.hide_background;
+                let hide_bg = config.settings.hide_background;
                 if MenuItem::new("Hide Background").selected(hide_bg).build(ui) {
-                    config.hide_background = !hide_bg;
+                    config.settings.hide_background = !hide_bg;
                 }
 
-                let show_sb = config.show_scrollbar;
+                let show_sb = config.settings.show_scrollbar;
                 if MenuItem::new("Show Scrollbar").selected(show_sb).build(ui) {
-                    config.show_scrollbar = !show_sb;
+                    config.settings.show_scrollbar = !show_sb;
                 }
             });
 
@@ -239,12 +239,12 @@ pub fn render_main_window(ui: &Ui) {
                 ui.text("Use Settings > Notifications & Tracking to tune reminders.");
                 ui.spacing();
                 if ui.button("Got it") {
-                    config.setup_onboarding_seen = true;
+                    config.settings.setup_onboarding_seen = true;
                     ui.close_current_popup();
                 }
             });
 
-            if config.show_time_ruler {
+            if config.settings.show_time_ruler {
                 // Calculate label offset for time ruler alignment
                 let label_offset = match label_column_pos {
                     LabelColumnPosition::Left => label_column_width,
@@ -256,8 +256,8 @@ pub fn render_main_window(ui: &Ui) {
                     view_range,
                     time_position,
                     label_offset,
-                    config.time_ruler_interval,
-                    config.time_ruler_show_current_time,
+                    config.settings.time_ruler_interval,
+                    config.settings.time_ruler_show_current_time,
                 );
             }
 
@@ -390,7 +390,7 @@ fn render_timeline_content(
     label_column_active: bool, // NEW PARAMETER
 ) {
     let mut rendered_categories: HashSet<String> = HashSet::new();
-    let ordered_categories = config.category_order.clone();
+    let ordered_categories = config.settings.category_order.clone();
 
     // First render categories in the defined order
     for category in &ordered_categories {
@@ -428,7 +428,7 @@ fn render_timeline_content(
     for track in config.tracks.iter() {
         if !rendered_categories.contains(&track.category) && track.visible {
             let is_category_visible = *config
-                .category_visibility
+                .settings.category_visibility
                 .get(&track.category)
                 .unwrap_or(&true);
             if is_category_visible {
@@ -638,7 +638,7 @@ fn render_label_column(
     label_category_color: [f32; 4],
 ) {
     let mut rendered_categories: HashSet<String> = HashSet::new();
-    let ordered_categories = config.category_order.clone();
+    let ordered_categories = config.settings.category_order.clone();
     let mut needs_spacing = false;
 
     // Render in order
@@ -671,7 +671,7 @@ fn render_label_column(
     for track in config.tracks.iter() {
         if !rendered_categories.contains(&track.category) && track.visible {
             let is_category_visible = *config
-                .category_visibility
+                .settings.category_visibility
                 .get(&track.category)
                 .unwrap_or(&true);
             if is_category_visible {
@@ -720,7 +720,7 @@ fn render_label_column_for_category(
         return;
     }
 
-    let is_category_visible = *config.category_visibility.get(category).unwrap_or(&true);
+    let is_category_visible = *config.settings.category_visibility.get(category).unwrap_or(&true);
     if !is_category_visible {
         rendered_categories.insert(category.to_string());
         return;
@@ -847,7 +847,7 @@ fn render_tracks_for_category(
         return;
     }
 
-    let is_category_visible = *config.category_visibility.get(category).unwrap_or(&true);
+    let is_category_visible = *config.settings.category_visibility.get(category).unwrap_or(&true);
     if !is_category_visible {
         rendered_categories.insert(category.to_string());
         return;

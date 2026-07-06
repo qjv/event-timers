@@ -7,9 +7,9 @@ use crate::time_utils::get_current_unix_time;
 pub fn update_notifications() {
     let current_time = get_current_unix_time();
     let mut config = RUNTIME_CONFIG.lock();
-    let tracked_events = &config.tracked_events;
-    let oneshot_events = &config.oneshot_events;
-    let notification_config = &config.notification_config;
+    let tracked_events = &config.settings.tracked_events;
+    let oneshot_events = &config.settings.oneshot_events;
+    let notification_config = &config.settings.notification_config;
     let tracks = &config.tracks;
 
     // Early exit if no tracked events
@@ -192,7 +192,7 @@ pub fn update_notifications() {
     // Remove fired oneshot events
     if !oneshot_to_remove.is_empty() {
         for event_id in oneshot_to_remove {
-            config.oneshot_events.remove(&event_id);
+            config.settings.oneshot_events.remove(&event_id);
         }
     }
 }
@@ -248,7 +248,7 @@ fn calculate_event_timing(
 pub fn is_event_tracked(track_name: &str, event_name: &str) -> bool {
     let config = RUNTIME_CONFIG.lock();
     let event_id = TrackedEventId::new(track_name, event_name);
-    config.tracked_events.contains(&event_id)
+    config.settings.tracked_events.contains(&event_id)
 }
 
 /// Toggle tracking for an event
@@ -256,10 +256,10 @@ pub fn toggle_event_tracking(track_name: &str, event_name: &str) {
     let mut config = RUNTIME_CONFIG.lock();
     let event_id = TrackedEventId::new(track_name, event_name);
 
-    if config.tracked_events.contains(&event_id) {
-        config.tracked_events.remove(&event_id);
+    if config.settings.tracked_events.contains(&event_id) {
+        config.settings.tracked_events.remove(&event_id);
     } else {
-        config.tracked_events.insert(event_id);
+        config.settings.tracked_events.insert(event_id);
     }
 }
 
@@ -268,10 +268,10 @@ pub fn toggle_event_favorite(track_name: &str, event_name: &str) {
     let mut config = RUNTIME_CONFIG.lock();
     let event_id = TrackedEventId::new(track_name, event_name);
 
-    if config.favorite_events.contains(&event_id) {
-        config.favorite_events.remove(&event_id);
+    if config.settings.favorite_events.contains(&event_id) {
+        config.settings.favorite_events.remove(&event_id);
     } else {
-        config.favorite_events.insert(event_id);
+        config.settings.favorite_events.insert(event_id);
     }
 }
 
@@ -281,9 +281,9 @@ pub fn set_event_tracking(track_name: &str, event_name: &str, tracked: bool) {
     let event_id = TrackedEventId::new(track_name, event_name);
 
     if tracked {
-        config.tracked_events.insert(event_id);
+        config.settings.tracked_events.insert(event_id);
     } else {
-        config.tracked_events.remove(&event_id);
+        config.settings.tracked_events.remove(&event_id);
     }
 }
 
@@ -292,9 +292,9 @@ pub fn toggle_oneshot_tracking(track_name: &str, event_name: &str) {
     let mut config = RUNTIME_CONFIG.lock();
     let event_id = TrackedEventId::new(track_name, event_name);
 
-    if config.oneshot_events.contains(&event_id) {
-        config.oneshot_events.remove(&event_id);
+    if config.settings.oneshot_events.contains(&event_id) {
+        config.settings.oneshot_events.remove(&event_id);
     } else {
-        config.oneshot_events.insert(event_id);
+        config.settings.oneshot_events.insert(event_id);
     }
 }

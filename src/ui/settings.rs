@@ -126,16 +126,16 @@ pub fn render_settings(ui: &Ui) {
 
         // --- Timeline ---
         ui.text("Timeline");
-        ui.checkbox("Show Time Ruler", &mut config.show_time_ruler);
+        ui.checkbox("Show Time Ruler", &mut config.settings.show_time_ruler);
 
-        if config.show_time_ruler {
+        if config.settings.show_time_ruler {
             // Time ruler marker spacing
             ui.text("Marker Spacing:");
             ui.same_line();
             for interval in TimeRulerInterval::all() {
                 if ui.radio_button(
                     &format!("{}##interval", interval.label()),
-                    &mut config.time_ruler_interval,
+                    &mut config.settings.time_ruler_interval,
                     *interval,
                 ) {}
                 ui.same_line();
@@ -144,57 +144,57 @@ pub fn render_settings(ui: &Ui) {
 
             ui.checkbox(
                 "Show Current Time on Ruler",
-                &mut config.time_ruler_show_current_time,
+                &mut config.settings.time_ruler_show_current_time,
             );
         }
 
-        let mut view_range_minutes = config.view_range_seconds / 60.0;
+        let mut view_range_minutes = config.settings.view_range_seconds / 60.0;
         if nexus::imgui::Slider::new("View Range (minutes)", 15.0, 120.0)
             .build(ui, &mut view_range_minutes)
         {
-            config.view_range_seconds = view_range_minutes * 60.0;
+            config.settings.view_range_seconds = view_range_minutes * 60.0;
         }
 
         nexus::imgui::Slider::new("Current Time Position", 0.0, 0.5)
             .display_format("%.2f")
-            .build(ui, &mut config.current_time_position);
+            .build(ui, &mut config.settings.current_time_position);
         ui.text_disabled("0.0 = Left edge, 0.5 = Center");
 
         ui.spacing();
 
         // --- Categories ---
         ui.text("Categories");
-        ui.checkbox("Show Category Headers", &mut config.show_category_headers);
+        ui.checkbox("Show Category Headers", &mut config.settings.show_category_headers);
 
-        if config.show_category_headers {
+        if config.settings.show_category_headers {
             ui.same_line();
             if ui.radio_button(
                 "Left##hdr",
-                &mut config.category_header_alignment,
+                &mut config.settings.category_header_alignment,
                 crate::config::TextAlignment::Left,
             ) {}
             ui.same_line();
             if ui.radio_button(
                 "Center##hdr",
-                &mut config.category_header_alignment,
+                &mut config.settings.category_header_alignment,
                 crate::config::TextAlignment::Center,
             ) {}
             ui.same_line();
             if ui.radio_button(
                 "Right##hdr",
-                &mut config.category_header_alignment,
+                &mut config.settings.category_header_alignment,
                 crate::config::TextAlignment::Right,
             ) {}
 
             nexus::imgui::Slider::new("Header Padding", 0.0, 50.0)
-                .build(ui, &mut config.category_header_padding);
+                .build(ui, &mut config.settings.category_header_padding);
         }
 
         nexus::imgui::Slider::new("Spacing (Same Category)", 0.0, 20.0)
-            .build(ui, &mut config.spacing_same_category);
+            .build(ui, &mut config.settings.spacing_same_category);
 
         nexus::imgui::Slider::new("Spacing (Between Categories)", 0.0, 50.0)
-            .build(ui, &mut config.spacing_between_categories);
+            .build(ui, &mut config.settings.spacing_between_categories);
 
         ui.spacing();
 
@@ -203,49 +203,49 @@ pub fn render_settings(ui: &Ui) {
         ui.same_line();
         if ui.radio_button(
             "None##lbl",
-            &mut config.label_column_position,
+            &mut config.settings.label_column_position,
             crate::config::LabelColumnPosition::None,
         ) {}
         ui.same_line();
         if ui.radio_button(
             "Left##lbl",
-            &mut config.label_column_position,
+            &mut config.settings.label_column_position,
             crate::config::LabelColumnPosition::Left,
         ) {}
         ui.same_line();
         if ui.radio_button(
             "Right##lbl",
-            &mut config.label_column_position,
+            &mut config.settings.label_column_position,
             crate::config::LabelColumnPosition::Right,
         ) {}
 
-        if config.label_column_position != crate::config::LabelColumnPosition::None {
+        if config.settings.label_column_position != crate::config::LabelColumnPosition::None {
             nexus::imgui::Slider::new("Label Column Width", 50.0, 300.0)
-                .build(ui, &mut config.label_column_width);
+                .build(ui, &mut config.settings.label_column_width);
 
             ui.checkbox(
                 "Show Category in Label",
-                &mut config.label_column_show_category,
+                &mut config.settings.label_column_show_category,
             );
             ui.checkbox(
                 "Show Track Name in Label",
-                &mut config.label_column_show_track,
+                &mut config.settings.label_column_show_track,
             );
 
             nexus::imgui::Slider::new("Label Text Size", 0.5, 2.0)
-                .build(ui, &mut config.label_column_text_size);
+                .build(ui, &mut config.settings.label_column_text_size);
 
-            ColorEdit::new("Label Background", &mut config.label_column_bg_color)
+            ColorEdit::new("Label Background", &mut config.settings.label_column_bg_color)
                 .flags(ColorEditFlags::ALPHA_BAR)
                 .build(ui);
 
-            ColorEdit::new("Label Track Text", &mut config.label_column_text_color)
+            ColorEdit::new("Label Track Text", &mut config.settings.label_column_text_color)
                 .flags(ColorEditFlags::ALPHA_BAR)
                 .build(ui);
 
             ColorEdit::new(
                 "Label Category Text",
-                &mut config.label_column_category_color,
+                &mut config.settings.label_column_category_color,
             )
             .flags(ColorEditFlags::ALPHA_BAR)
             .build(ui);
@@ -256,42 +256,42 @@ pub fn render_settings(ui: &Ui) {
         // --- Appearance ---
         ui.text("Appearance");
 
-        ColorEdit::new("Track Background", &mut config.global_track_background)
+        ColorEdit::new("Track Background", &mut config.settings.global_track_background)
             .flags(ColorEditFlags::ALPHA_BAR)
             .build(ui);
 
         nexus::imgui::Slider::new("Track Padding", 0.0, 20.0)
-            .build(ui, &mut config.global_track_padding);
+            .build(ui, &mut config.settings.global_track_padding);
 
         ui.checkbox(
             "Override All Track Heights",
-            &mut config.override_all_track_heights,
+            &mut config.settings.override_all_track_heights,
         );
-        if config.override_all_track_heights {
+        if config.settings.override_all_track_heights {
             nexus::imgui::Slider::new("Global Track Height", 20.0, 200.0)
-                .build(ui, &mut config.global_track_height);
+                .build(ui, &mut config.settings.global_track_height);
         }
 
-        ui.checkbox("Draw Event Borders", &mut config.draw_event_borders);
-        if config.draw_event_borders {
-            ColorEdit::new("Border Color", &mut config.event_border_color)
+        ui.checkbox("Draw Event Borders", &mut config.settings.draw_event_borders);
+        if config.settings.draw_event_borders {
+            ColorEdit::new("Border Color", &mut config.settings.event_border_color)
                 .flags(ColorEditFlags::ALPHA_BAR)
                 .build(ui);
 
             nexus::imgui::Slider::new("Border Thickness", 1.0, 5.0)
-                .build(ui, &mut config.event_border_thickness);
+                .build(ui, &mut config.settings.event_border_thickness);
         }
 
         ui.spacing();
 
         // --- Other ---
         ui.text("Other");
-        ui.checkbox("Close window with ESC", &mut config.close_on_escape);
+        ui.checkbox("Close window with ESC", &mut config.settings.close_on_escape);
         ui.checkbox(
             "Include event name when copying waypoint",
-            &mut config.copy_with_event_name,
+            &mut config.settings.copy_with_event_name,
         );
-        ui.checkbox("Show quick access icon", &mut config.show_quick_access_icon);
+        ui.checkbox("Show quick access icon", &mut config.settings.show_quick_access_icon);
 
         ui.unindent();
     }
@@ -304,96 +304,96 @@ pub fn render_settings(ui: &Ui) {
         ui.text("Toast Notifications");
         ui.checkbox(
             "Enable Toasts",
-            &mut config.notification_config.toast_enabled,
+            &mut config.settings.notification_config.toast_enabled,
         );
 
-        if config.notification_config.toast_enabled {
+        if config.settings.notification_config.toast_enabled {
             nexus::imgui::Slider::new("Toast Duration (sec)", 3.0, 15.0)
-                .build(ui, &mut config.notification_config.toast_duration_seconds);
+                .build(ui, &mut config.settings.notification_config.toast_duration_seconds);
 
-            let mut max_toasts = config.notification_config.max_visible_toasts as i32;
+            let mut max_toasts = config.settings.notification_config.max_visible_toasts as i32;
             if nexus::imgui::Slider::new("Max Visible Toasts", 1, 5).build(ui, &mut max_toasts) {
-                config.notification_config.max_visible_toasts = max_toasts as usize;
+                config.settings.notification_config.max_visible_toasts = max_toasts as usize;
             }
 
             ui.text("Toast Position:");
             if ui.radio_button(
                 "Top Left##tp",
-                &mut config.notification_config.toast_position,
+                &mut config.settings.notification_config.toast_position,
                 ToastPosition::TopLeft,
             ) {}
             ui.same_line();
             if ui.radio_button(
                 "Top Right##tp",
-                &mut config.notification_config.toast_position,
+                &mut config.settings.notification_config.toast_position,
                 ToastPosition::TopRight,
             ) {}
             if ui.radio_button(
                 "Bottom Left##tp",
-                &mut config.notification_config.toast_position,
+                &mut config.settings.notification_config.toast_position,
                 ToastPosition::BottomLeft,
             ) {}
             ui.same_line();
             if ui.radio_button(
                 "Bottom Right##tp",
-                &mut config.notification_config.toast_position,
+                &mut config.settings.notification_config.toast_position,
                 ToastPosition::BottomRight,
             ) {}
 
-            let mut x_pct = config.notification_config.toast_offset_x * 100.0;
+            let mut x_pct = config.settings.notification_config.toast_offset_x * 100.0;
             if nexus::imgui::Slider::new("X Offset", 0.0, 50.0)
                 .display_format("%.0f%%")
                 .build(ui, &mut x_pct)
             {
-                config.notification_config.toast_offset_x = x_pct / 100.0;
+                config.settings.notification_config.toast_offset_x = x_pct / 100.0;
             }
-            let mut y_pct = config.notification_config.toast_offset_y * 100.0;
+            let mut y_pct = config.settings.notification_config.toast_offset_y * 100.0;
             if nexus::imgui::Slider::new("Y Offset", 0.0, 50.0)
                 .display_format("%.0f%%")
                 .build(ui, &mut y_pct)
             {
-                config.notification_config.toast_offset_y = y_pct / 100.0;
+                config.settings.notification_config.toast_offset_y = y_pct / 100.0;
             }
 
             nexus::imgui::Slider::new("Toast Width", 200.0, 500.0)
-                .build(ui, &mut config.notification_config.toast_size[0]);
+                .build(ui, &mut config.settings.notification_config.toast_size[0]);
             nexus::imgui::Slider::new("Toast Height", 60.0, 150.0)
-                .build(ui, &mut config.notification_config.toast_size[1]);
+                .build(ui, &mut config.settings.notification_config.toast_size[1]);
 
             nexus::imgui::Slider::new("Toast Text Scale", 0.8, 2.0)
-                .build(ui, &mut config.notification_config.toast_text_scale);
+                .build(ui, &mut config.settings.notification_config.toast_text_scale);
 
             ColorEdit::new(
                 "Toast Background",
-                &mut config.notification_config.toast_bg_color,
+                &mut config.settings.notification_config.toast_bg_color,
             )
             .flags(ColorEditFlags::ALPHA_BAR)
             .build(ui);
 
             ColorEdit::new(
                 "Toast Event Name",
-                &mut config.notification_config.toast_title_color,
+                &mut config.settings.notification_config.toast_title_color,
             )
             .flags(ColorEditFlags::ALPHA_BAR)
             .build(ui);
 
             ColorEdit::new(
                 "Toast Track Name",
-                &mut config.notification_config.toast_track_color,
+                &mut config.settings.notification_config.toast_track_color,
             )
             .flags(ColorEditFlags::ALPHA_BAR)
             .build(ui);
 
             ColorEdit::new(
                 "Toast Time Text",
-                &mut config.notification_config.toast_time_color,
+                &mut config.settings.notification_config.toast_time_color,
             )
             .flags(ColorEditFlags::ALPHA_BAR)
             .build(ui);
 
             if ui.button("Preview Toast") {
                 let (name, color) = config
-                    .notification_config
+                    .settings.notification_config
                     .reminders
                     .first()
                     .map(|r| (r.name.clone(), r.text_color))
@@ -409,48 +409,48 @@ pub fn render_settings(ui: &Ui) {
         ui.text("Reminders");
         ui.text_disabled("Configure when notifications trigger");
 
-        let mut grace_minutes = config.notification_config.happening_now_grace_minutes as i32;
+        let mut grace_minutes = config.settings.notification_config.happening_now_grace_minutes as i32;
         if nexus::imgui::Slider::new("\"Happening now\" Grace (min)", 0, 60)
             .build(ui, &mut grace_minutes)
         {
-            config.notification_config.happening_now_grace_minutes = grace_minutes.max(0) as u32;
+            config.settings.notification_config.happening_now_grace_minutes = grace_minutes.max(0) as u32;
         }
 
         let mut reminder_to_remove: Option<usize> = None;
-        let reminder_count = config.notification_config.reminders.len();
+        let reminder_count = config.settings.notification_config.reminders.len();
 
         for i in 0..reminder_count {
             ui.separator();
             let _id = ui.push_id(&format!("rem_{}", i));
 
-            let mut name = config.notification_config.reminders[i].name.clone();
+            let mut name = config.settings.notification_config.reminders[i].name.clone();
             if InputText::new(ui, "##name", &mut name)
                 .hint("Reminder name")
                 .build()
             {
-                config.notification_config.reminders[i].name = name;
+                config.settings.notification_config.reminders[i].name = name;
             }
 
-            let mut minutes = config.notification_config.reminders[i].minutes_before as i32;
+            let mut minutes = config.settings.notification_config.reminders[i].minutes_before as i32;
             if nexus::imgui::Slider::new("Minutes Before", 0, 30).build(ui, &mut minutes) {
-                config.notification_config.reminders[i].minutes_before = minutes as u32;
+                config.settings.notification_config.reminders[i].minutes_before = minutes as u32;
             }
 
-            if config.notification_config.reminders[i].minutes_before == 0 {
+            if config.settings.notification_config.reminders[i].minutes_before == 0 {
                 ui.text_disabled("0 = Repeats during event");
                 let mut interval =
-                    config.notification_config.reminders[i].ongoing_interval_minutes as i32;
+                    config.settings.notification_config.reminders[i].ongoing_interval_minutes as i32;
                 if nexus::imgui::Slider::new("Repeat Interval (min)", 1, 10)
                     .build(ui, &mut interval)
                 {
-                    config.notification_config.reminders[i].ongoing_interval_minutes =
+                    config.settings.notification_config.reminders[i].ongoing_interval_minutes =
                         interval.max(1) as u32;
                 }
             }
 
             ColorEdit::new(
                 "Reminder Color",
-                &mut config.notification_config.reminders[i].text_color,
+                &mut config.settings.notification_config.reminders[i].text_color,
             )
             .flags(ColorEditFlags::ALPHA_BAR)
             .build(ui);
@@ -461,13 +461,13 @@ pub fn render_settings(ui: &Ui) {
         }
 
         if let Some(idx) = reminder_to_remove {
-            config.notification_config.reminders.remove(idx);
+            config.settings.notification_config.reminders.remove(idx);
         }
 
         ui.separator();
         if ui.button("Add Reminder") {
             config
-                .notification_config
+                .settings.notification_config
                 .reminders
                 .push(crate::config::ReminderConfig::default());
         }
@@ -479,14 +479,14 @@ pub fn render_settings(ui: &Ui) {
         ui.text("Upcoming Events Panel");
         ui.checkbox(
             "Enable Panel",
-            &mut config.notification_config.upcoming_panel_enabled,
+            &mut config.settings.notification_config.upcoming_panel_enabled,
         );
 
-        if config.notification_config.upcoming_panel_enabled {
-            let mut max_upcoming = config.notification_config.max_upcoming_events as i32;
+        if config.settings.notification_config.upcoming_panel_enabled {
+            let mut max_upcoming = config.settings.notification_config.max_upcoming_events as i32;
             if nexus::imgui::Slider::new("Max Events in Panel", 5, 20).build(ui, &mut max_upcoming)
             {
-                config.notification_config.max_upcoming_events = max_upcoming as usize;
+                config.settings.notification_config.max_upcoming_events = max_upcoming as usize;
             }
         }
 
@@ -534,8 +534,8 @@ pub fn render_settings(ui: &Ui) {
                         let event_id = TrackedEventId::new(&track.name, &event.name);
                         let key = (track.name.clone(), event.name.clone());
                         // Exclude already tracked or oneshot events
-                        if !config.tracked_events.contains(&event_id)
-                            && !config.oneshot_events.contains(&event_id)
+                        if !config.settings.tracked_events.contains(&event_id)
+                            && !config.settings.oneshot_events.contains(&event_id)
                             && !seen.contains(&key)
                         {
                             seen.insert(key);
@@ -618,11 +618,11 @@ pub fn render_settings(ui: &Ui) {
                 }
 
                 if let Some(id) = to_track {
-                    config.tracked_events.insert(id);
+                    config.settings.tracked_events.insert(id);
                     SEARCH_TEXT.with(|s| s.borrow_mut().clear());
                 }
                 if let Some(id) = to_oneshot {
-                    config.oneshot_events.insert(id);
+                    config.settings.oneshot_events.insert(id);
                     SEARCH_TEXT.with(|s| s.borrow_mut().clear());
                 }
 
@@ -634,9 +634,9 @@ pub fn render_settings(ui: &Ui) {
             }
         }
 
-        let tracked_count = config.tracked_events.len();
-        let oneshot_count = config.oneshot_events.len();
-        let favorite_count = config.favorite_events.len();
+        let tracked_count = config.settings.tracked_events.len();
+        let oneshot_count = config.settings.oneshot_events.len();
+        let favorite_count = config.settings.favorite_events.len();
 
         // Header with counts
         ui.text_colored([0.4, 0.8, 1.0, 1.0], &format!("{} Tracked", tracked_count));
@@ -659,9 +659,9 @@ pub fn render_settings(ui: &Ui) {
             ui.same_line();
             if ui.io().key_ctrl {
                 if ui.small_button("Clear All") {
-                    config.tracked_events.clear();
-                    config.oneshot_events.clear();
-                    config.favorite_events.clear();
+                    config.settings.tracked_events.clear();
+                    config.settings.oneshot_events.clear();
+                    config.settings.favorite_events.clear();
                 }
             } else {
                 ui.text_disabled("[Ctrl to clear]");
@@ -681,22 +681,22 @@ pub fn render_settings(ui: &Ui) {
 
             // Combine tracked and oneshot events for display
             let tracked: Vec<(TrackedEventId, bool, bool)> = config
-                .tracked_events
+                .settings.tracked_events
                 .iter()
-                .map(|id| (id.clone(), false, config.favorite_events.contains(id)))
+                .map(|id| (id.clone(), false, config.settings.favorite_events.contains(id)))
                 .chain(
                     config
-                        .oneshot_events
+                        .settings.oneshot_events
                         .iter()
-                        .map(|id| (id.clone(), true, config.favorite_events.contains(id))),
+                        .map(|id| (id.clone(), true, config.settings.favorite_events.contains(id))),
                 )
                 .chain(
                     config
-                        .favorite_events
+                        .settings.favorite_events
                         .iter()
                         .filter(|id| {
-                            !config.tracked_events.contains(*id)
-                                && !config.oneshot_events.contains(*id)
+                            !config.settings.tracked_events.contains(*id)
+                                && !config.settings.oneshot_events.contains(*id)
                         })
                         .map(|id| (id.clone(), false, true)),
                 )
@@ -793,11 +793,11 @@ pub fn render_settings(ui: &Ui) {
 
             for (id, is_oneshot, is_favorite) in to_remove {
                 if is_oneshot {
-                    config.oneshot_events.remove(&id);
-                } else if is_favorite && !config.tracked_events.contains(&id) {
-                    config.favorite_events.remove(&id);
+                    config.settings.oneshot_events.remove(&id);
+                } else if is_favorite && !config.settings.tracked_events.contains(&id) {
+                    config.settings.favorite_events.remove(&id);
                 } else {
-                    config.tracked_events.remove(&id);
+                    config.settings.tracked_events.remove(&id);
                 }
             }
         } else {
@@ -850,24 +850,24 @@ pub fn render_settings(ui: &Ui) {
             }
         }
 
-        if config.category_order.is_empty() {
-            config.category_order = all_categories.clone();
+        if config.settings.category_order.is_empty() {
+            config.settings.category_order = all_categories.clone();
         } else {
             for cat in &all_categories {
-                if !config.category_order.contains(cat) {
-                    config.category_order.push(cat.clone());
+                if !config.settings.category_order.contains(cat) {
+                    config.settings.category_order.push(cat.clone());
                 }
             }
             config
-                .category_order
+                .settings.category_order
                 .retain(|cat| all_categories.contains(cat));
         }
 
-        let ordered_categories = config.category_order.clone();
+        let ordered_categories = config.settings.category_order.clone();
 
         for category_name in &ordered_categories {
             config
-                .category_visibility
+                .settings.category_visibility
                 .entry(category_name.clone())
                 .or_insert(true);
         }
@@ -877,7 +877,7 @@ pub fn render_settings(ui: &Ui) {
 
         for (cat_pos, category) in ordered_categories.iter().enumerate() {
             if show_vis {
-                let is_visible = config.category_visibility.get_mut(category).unwrap();
+                let is_visible = config.settings.category_visibility.get_mut(category).unwrap();
                 ui.checkbox(&format!("##vis_{}", category), is_visible);
                 ui.same_line();
             }
@@ -946,14 +946,14 @@ pub fn render_settings(ui: &Ui) {
 
                     if is_default {
                         if ui.collapsing_header(&track_name, TreeNodeFlags::empty()) {
-                            let mut tracked_events_clone = config.tracked_events.clone();
+                            let mut tracked_events_clone = config.settings.tracked_events.clone();
                             let track = &mut config.tracks[index];
                             render_default_track_editor_inline(
                                 ui,
                                 track,
                                 &mut tracked_events_clone,
                             );
-                            config.tracked_events = tracked_events_clone;
+                            config.settings.tracked_events = tracked_events_clone;
                         }
                     } else {
                         ui.text(&track_name);
@@ -987,9 +987,9 @@ pub fn render_settings(ui: &Ui) {
         }
 
         if let Some(pos) = category_to_move_up {
-            config.category_order.swap(pos, pos - 1);
+            config.settings.category_order.swap(pos, pos - 1);
         } else if let Some(pos) = category_to_move_down {
-            config.category_order.swap(pos, pos + 1);
+            config.settings.category_order.swap(pos, pos + 1);
         }
 
         ui.separator();
@@ -1019,12 +1019,7 @@ pub fn render_settings(ui: &Ui) {
     ui.text_colored([1.0, 0.4, 0.4, 1.0], "Reset");
     if ui.io().key_ctrl {
         if ui.button("Reset All Settings") {
-            if let Some(path) = crate::config::get_user_config_path() {
-                if std::fs::remove_file(&path).is_ok() {
-                    *crate::config::USER_CONFIG.lock() = crate::config::UserConfig::default();
-                    crate::config::apply_user_overrides();
-                }
-            }
+            crate::config::reset_all_settings(&mut config);
         }
     } else {
         ui.text_disabled("[Hold Ctrl] Reset All Settings");

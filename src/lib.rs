@@ -40,21 +40,21 @@ static BG_THREAD: Lazy<Mutex<Option<thread::JoinHandle<()>>>> = Lazy::new(|| Mut
 extern "C-unwind" fn toggle_window_keybind(_identifier: *const c_char, is_release: bool) {
     if !is_release {
         let mut config = RUNTIME_CONFIG.lock();
-        config.show_main_window = !config.show_main_window;
+        config.settings.show_main_window = !config.settings.show_main_window;
     }
 }
 
 extern "C-unwind" fn toggle_toasts_keybind(_identifier: *const c_char, is_release: bool) {
     if !is_release {
         let mut config = RUNTIME_CONFIG.lock();
-        config.notification_config.toast_enabled = !config.notification_config.toast_enabled;
+        config.settings.notification_config.toast_enabled = !config.settings.notification_config.toast_enabled;
     }
 }
 
 extern "C-unwind" fn toggle_upcoming_panel_keybind(_identifier: *const c_char, is_release: bool) {
     if !is_release {
         let mut config = RUNTIME_CONFIG.lock();
-        config.notification_config.upcoming_panel_enabled = !config.notification_config.upcoming_panel_enabled;
+        config.settings.notification_config.upcoming_panel_enabled = !config.settings.notification_config.upcoming_panel_enabled;
     }
 }
 
@@ -78,7 +78,7 @@ fn load() {
     // Setup Quick Access icon
     let show_quick_access_icon = {
         let config = RUNTIME_CONFIG.lock();
-        config.show_quick_access_icon
+        config.settings.show_quick_access_icon
     };
     if show_quick_access_icon {
         setup_quick_access();
@@ -98,8 +98,8 @@ fn load() {
         let (toast_enabled, upcoming_enabled) = {
             let config = RUNTIME_CONFIG.lock();
             (
-                config.notification_config.toast_enabled,
-                config.notification_config.upcoming_panel_enabled,
+                config.settings.notification_config.toast_enabled,
+                config.settings.notification_config.upcoming_panel_enabled,
             )
         };
         if toast_enabled {
@@ -123,10 +123,10 @@ fn load() {
                 let (has_targets, any_surface_enabled) = {
                     let config = RUNTIME_CONFIG.lock();
                     let has_targets =
-                        !config.tracked_events.is_empty() || !config.oneshot_events.is_empty();
-                    let any_surface_enabled = config.notification_config.toast_enabled
-                        || config.notification_config.upcoming_panel_enabled
-                        || config.show_main_window;
+                        !config.settings.tracked_events.is_empty() || !config.settings.oneshot_events.is_empty();
+                    let any_surface_enabled = config.settings.notification_config.toast_enabled
+                        || config.settings.notification_config.upcoming_panel_enabled
+                        || config.settings.show_main_window;
                     (has_targets, any_surface_enabled)
                 };
                 if has_targets && any_surface_enabled {
