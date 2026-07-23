@@ -637,6 +637,8 @@ pub static RUNTIME_CONFIG: Lazy<Mutex<RuntimeConfig>> =
 pub static USER_CONFIG: Lazy<Mutex<UserConfig>> = Lazy::new(|| Mutex::new(UserConfig::default()));
 pub static SELECTED_TRACK: Lazy<Mutex<Option<usize>>> = Lazy::new(|| Mutex::new(None));
 pub static SELECTED_EVENT: Lazy<Mutex<Option<usize>>> = Lazy::new(|| Mutex::new(None));
+static CONFIG_IO_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+static LAST_SAVED_CONFIG: Lazy<Mutex<Option<Vec<u8>>>> = Lazy::new(|| Mutex::new(None));
 
 // === Configuration Management ===
 
@@ -882,10 +884,22 @@ pub fn get_user_config_path() -> Option<PathBuf> {
 
 pub fn load_user_config() {
     if let Some(path) = get_user_config_path() {
-        if path.exists() {
-            if let Ok(json_str) = fs::read_to_string(&path) {
-                if let Ok(loaded) = serde_json::from_str::<UserConfig>(&json_str) {
+        let _io = CONFIG_IO_LOCK.lock();
+        let candidates = [
+            path.clone(),
+            path.with_extension("json.tmp"),
+            path.with_extension("json.backup"),
+        ];
+        for candidate in candidates {
+            if let Ok(json) = fs::read(&candidate) {
+                if let Ok(loaded) = serde_json::from_slice::<UserConfig>(&json) {
+                    *LAST_SAVED_CONFIG.lock() = if candidate == path {
+                        serde_json::to_vec_pretty(&loaded).ok()
+                    } else {
+                        None
+                    };
                     *USER_CONFIG.lock() = loaded;
+                    drop(_io);
                     apply_user_overrides();
                     return;
                 }
@@ -893,19 +907,44 @@ pub fn load_user_config() {
         }
     }
 
+    *LAST_SAVED_CONFIG.lock() = None;
     apply_user_overrides();
 }
 
 pub fn save_user_config() {
     extract_user_overrides();
 
-    let user_cfg = USER_CONFIG.lock();
-    if let Some(path) = get_user_config_path() {
-        if let Some(dir) = path.parent() {
-            fs::create_dir_all(dir).ok();
+    let json = {
+        let user_cfg = USER_CONFIG.lock();
+        match serde_json::to_vec_pretty(&*user_cfg) {
+            Ok(json) => json,
+            Err(_) => return,
         }
-        if let Ok(json_str) = serde_json::to_string_pretty(&*user_cfg) {
-            fs::write(&path, json_str).ok();
+    };
+    if LAST_SAVED_CONFIG.lock().as_deref() == Some(json.as_slice()) {
+        return;
+    }
+
+    if let Some(path) = get_user_config_path() {
+        let _io = CONFIG_IO_LOCK.lock();
+        if let Some(dir) = path.parent() {
+            if fs::create_dir_all(dir).is_err() {
+                return;
+            }
+        }
+        let temporary = path.with_extension("json.tmp");
+        let backup = path.with_extension("json.backup");
+        if fs::write(&temporary, &json).is_err() {
+            return;
+        }
+        if path.exists() {
+            let _ = fs::copy(&path, &backup);
+            if fs::remove_file(&path).is_err() {
+                return;
+            }
+        }
+        if fs::rename(&temporary, &path).is_ok() {
+            *LAST_SAVED_CONFIG.lock() = Some(json);
         }
     }
 }

@@ -356,7 +356,9 @@ pub fn render_main_window(ui: &Ui) {
         });
 }
 
-fn to_track_event_map(source: &StdHashSet<TrackedEventId>) -> StdHashMap<String, StdHashSet<String>> {
+fn to_track_event_map(
+    source: &StdHashSet<TrackedEventId>,
+) -> StdHashMap<String, StdHashSet<String>> {
     let mut map: StdHashMap<String, StdHashSet<String>> = StdHashMap::new();
     for id in source {
         map.entry(id.track_name.clone())

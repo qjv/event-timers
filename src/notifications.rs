@@ -128,7 +128,8 @@ impl NotificationState {
 
     /// Mark that we just notified for this event
     pub fn mark_event_notified(&mut self, event_id: &TrackedEventId, current_time: i64) {
-        self.event_last_notified.insert(event_id.clone(), current_time);
+        self.event_last_notified
+            .insert(event_id.clone(), current_time);
     }
 
     /// Show a preview toast notification
@@ -194,7 +195,12 @@ impl NotificationState {
     }
 
     /// Mark a reminder as shown for an event occurrence
-    pub fn mark_notified(&mut self, event_id: &TrackedEventId, start_time: i64, minutes_before: u32) {
+    pub fn mark_notified(
+        &mut self,
+        event_id: &TrackedEventId,
+        start_time: i64,
+        minutes_before: u32,
+    ) {
         self.notified_reminders.insert(NotifiedKey {
             event_id: event_id.clone(),
             start_time,
@@ -203,7 +209,12 @@ impl NotificationState {
     }
 
     /// Check if a reminder was already shown for an event occurrence
-    pub fn was_notified(&self, event_id: &TrackedEventId, start_time: i64, minutes_before: u32) -> bool {
+    pub fn was_notified(
+        &self,
+        event_id: &TrackedEventId,
+        start_time: i64,
+        minutes_before: u32,
+    ) -> bool {
         self.notified_reminders.contains(&NotifiedKey {
             event_id: event_id.clone(),
             start_time,
@@ -214,21 +225,24 @@ impl NotificationState {
     /// Clean up old notified entries (keep entries from last 24 hours)
     pub fn cleanup_old_notifications(&mut self, current_time: i64) {
         let cutoff = current_time - 86400; // 24 hours ago
-        self.notified_reminders.retain(|key| {
-            key.start_time > cutoff
-        });
-        self.ongoing_last_notified.retain(|key, _| {
-            key.start_time > cutoff
-        });
+        self.notified_reminders
+            .retain(|key| key.start_time > cutoff);
+        self.ongoing_last_notified
+            .retain(|key, _| key.start_time > cutoff);
         // Clean up per-event cooldown entries older than 5 minutes
-        self.event_last_notified.retain(|_, &mut last_time| {
-            current_time - last_time < 300
-        });
+        self.event_last_notified
+            .retain(|_, &mut last_time| current_time - last_time < 300);
     }
 
     /// Check if enough time has passed since last ongoing notification for this event
     /// Returns true if we should show a notification (either first time or interval has passed)
-    pub fn should_show_ongoing(&self, event_id: &TrackedEventId, start_time: i64, current_time: i64, interval_seconds: i64) -> bool {
+    pub fn should_show_ongoing(
+        &self,
+        event_id: &TrackedEventId,
+        start_time: i64,
+        current_time: i64,
+        interval_seconds: i64,
+    ) -> bool {
         let key = OngoingNotificationKey {
             event_id: event_id.clone(),
             start_time,
@@ -247,7 +261,12 @@ impl NotificationState {
     }
 
     /// Mark that we just showed an ongoing notification for this event
-    pub fn mark_ongoing_notified(&mut self, event_id: &TrackedEventId, start_time: i64, current_time: i64) {
+    pub fn mark_ongoing_notified(
+        &mut self,
+        event_id: &TrackedEventId,
+        start_time: i64,
+        current_time: i64,
+    ) {
         let key = OngoingNotificationKey {
             event_id: event_id.clone(),
             start_time,

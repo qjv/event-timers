@@ -1,14 +1,13 @@
 use nexus::imgui::{
-    ColorEdit, ColorEditFlags, InputFloat, InputText, Selectable, TableFlags, TreeNodeFlags, Ui,
-    Window,
+    ColorEdit, ColorEditFlags, InputFloat, InputText, InputTextFlags, Selectable, TableFlags,
+    TreeNodeFlags, Ui, Window,
 };
 use parking_lot::MutexGuard;
 use std::collections::HashSet;
 
 use crate::config::{
-    load_user_config, RuntimeConfig, TimeRulerInterval, ToastPosition, TrackedEventId,
-    RUNTIME_CONFIG,
-    SELECTED_EVENT, SELECTED_TRACK,
+    load_user_config, save_user_config, RuntimeConfig, TimeRulerInterval, ToastPosition,
+    TrackedEventId, RUNTIME_CONFIG, SELECTED_EVENT, SELECTED_TRACK,
 };
 use crate::json_loader::{load_tracks_from_json, EventColor, EventTrack, TimelineEvent};
 use crate::notifications::NOTIFICATION_STATE;
@@ -40,7 +39,7 @@ pub fn check_for_event_tracks_update() {
             nexus::log::log(
                 nexus::log::LogLevel::Info,
                 "Event Timers",
-                "Checking for event_tracks.json updates from GitHub..."
+                "Checking for event_tracks.json updates from GitHub...",
             );
 
             match reqwest::get(GITHUB_EVENT_TRACKS_URL).await {
@@ -68,19 +67,21 @@ pub fn check_for_event_tracks_update() {
 
                                     match std::fs::write(&path, github_content) {
                                         Ok(_) => {
-                                            // Apply updated tracks immediately in runtime state.
+                                            // Preserve changes made while the download was in
+                                            // flight before rebuilding tracks from the update.
+                                            save_user_config();
                                             load_user_config();
                                             nexus::log::log(
                                                 nexus::log::LogLevel::Info,
                                                 "Event Timers",
-                                                "event_tracks.json updated and applied."
+                                                "event_tracks.json updated and applied.",
                                             );
                                         }
                                         Err(e) => {
                                             nexus::log::log(
                                                 nexus::log::LogLevel::Critical,
                                                 "Event Timers",
-                                                &format!("Failed to write file: {}", e)
+                                                &format!("Failed to write file: {}", e),
                                             );
                                         }
                                     }
@@ -88,7 +89,7 @@ pub fn check_for_event_tracks_update() {
                                     nexus::log::log(
                                         nexus::log::LogLevel::Info,
                                         "Event Timers",
-                                        "event_tracks.json is already up to date!"
+                                        "event_tracks.json is already up to date!",
                                     );
                                 }
                             }
@@ -97,7 +98,7 @@ pub fn check_for_event_tracks_update() {
                             nexus::log::log(
                                 nexus::log::LogLevel::Critical,
                                 "Event Timers",
-                                &format!("Failed to read response: {}", e)
+                                &format!("Failed to read response: {}", e),
                             );
                         }
                     }
@@ -106,7 +107,7 @@ pub fn check_for_event_tracks_update() {
                     nexus::log::log(
                         nexus::log::LogLevel::Critical,
                         "Event Timers",
-                        &format!("Failed to fetch from GitHub: {}", e)
+                        &format!("Failed to fetch from GitHub: {}", e),
                     );
                 }
             }
@@ -119,6 +120,27 @@ pub fn render_settings(ui: &Ui) {
 
     ui.text("Event Timers Settings");
     ui.separator();
+
+    if ui.collapsing_header("Daily Completion API", TreeNodeFlags::empty()) {
+        ui.indent();
+        let completion_settings = crate::completion::settings();
+        let mut enabled = completion_settings.enabled;
+        let mut api_key = completion_settings.api_key;
+        let mut changed = ui.checkbox("Strike completed daily events", &mut enabled);
+        changed |= InputText::new(ui, "GW2 API key", &mut api_key)
+            .flags(InputTextFlags::PASSWORD)
+            .build();
+        ui.text_wrapped("Requires an ArenaNet API key with account and progression permissions. The key is stored only in this addon's local folder.");
+        if changed {
+            crate::completion::update_settings(enabled, api_key);
+        }
+        if ui.button("Refresh completions now") {
+            crate::completion::request_refresh();
+        }
+        ui.same_line();
+        ui.text_disabled(crate::completion::status());
+        ui.unindent();
+    }
 
     // ==================== MAIN WINDOW ====================
     if ui.collapsing_header("Main Window", TreeNodeFlags::DEFAULT_OPEN) {
@@ -753,12 +775,28 @@ pub fn render_settings(ui: &Ui) {
                     // Event name column
                     ui.table_next_column();
                     ui.set_window_font_scale(1.1);
-                    if *is_favorite {
+                    let completed =
+                        crate::completion::is_completed(&event_id.track_name, &event_id.event_name);
+                    if completed {
+                        ui.text_colored([0.52, 0.52, 0.52, 1.0], &event_id.event_name);
+                    } else if *is_favorite {
                         ui.text_colored([1.0, 0.82, 0.18, 1.0], &event_id.event_name);
                     } else if *is_oneshot {
                         ui.text_colored([1.0, 0.8, 0.4, 1.0], &event_id.event_name);
                     } else {
                         ui.text_colored([1.0, 1.0, 1.0, 1.0], &event_id.event_name);
+                    }
+                    if completed {
+                        let min = ui.item_rect_min();
+                        let max = ui.item_rect_max();
+                        ui.get_window_draw_list()
+                            .add_line(
+                                [min[0], (min[1] + max[1]) * 0.5],
+                                [max[0], (min[1] + max[1]) * 0.5],
+                                [0.72, 0.72, 0.72, 0.95],
+                            )
+                            .thickness(1.5)
+                            .build();
                     }
                     ui.set_window_font_scale(1.0);
 

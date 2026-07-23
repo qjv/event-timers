@@ -2,6 +2,23 @@ use crate::config::{TrackedEventId, RUNTIME_CONFIG};
 use crate::json_loader::{EventTrack, TimelineEvent};
 use crate::notifications::{UpcomingEvent, NOTIFICATION_STATE};
 use crate::time_utils::get_current_unix_time;
+use std::collections::HashMap;
+
+fn insert_upcoming(
+    upcoming_by_event: &mut HashMap<TrackedEventId, UpcomingEvent>,
+    upcoming: UpcomingEvent,
+) {
+    let event_id = upcoming.event_id.clone();
+    match upcoming_by_event.get_mut(&event_id) {
+        Some(existing) if upcoming.seconds_until < existing.seconds_until => {
+            *existing = upcoming;
+        }
+        None => {
+            upcoming_by_event.insert(event_id, upcoming);
+        }
+        _ => {}
+    }
+}
 
 /// Background update function - called by maintenance ticker.
 pub fn update_notifications() {
@@ -33,7 +50,7 @@ pub fn update_notifications() {
     // Clean up old notification records
     state.cleanup_old_notifications(current_time);
 
-    let mut upcoming: Vec<UpcomingEvent> = Vec::new();
+    let mut upcoming_by_event: HashMap<TrackedEventId, UpcomingEvent> = HashMap::new();
 
     for track in tracks {
         if !track.visible {
@@ -64,7 +81,7 @@ pub fn update_notifications() {
             )) = calculate_event_timing(track, event, current_time)
             {
                 // Add to upcoming events list
-                upcoming.push(UpcomingEvent {
+                let upcoming = UpcomingEvent {
                     event_id: event_id.clone(),
                     start_time,
                     seconds_until,
@@ -75,7 +92,8 @@ pub fn update_notifications() {
                     },
                     color: event.color.to_array(),
                     copy_text: event.copy_text.clone(),
-                });
+                };
+                insert_upcoming(&mut upcoming_by_event, upcoming);
 
                 // Check each configured reminder
                 if notification_config.toast_enabled {
@@ -178,6 +196,8 @@ pub fn update_notifications() {
         }
     }
 
+    let mut upcoming = upcoming_by_event.into_values().collect::<Vec<_>>();
+
     // Sort by time (soonest first)
     upcoming.sort_by_key(|e| e.seconds_until);
 
@@ -206,6 +226,9 @@ fn calculate_event_timing(
     event: &TimelineEvent,
     current_time: i64,
 ) -> Option<(i64, i64, i64, i64, i64)> {
+    if event.cycle_duration <= 0 || event.duration <= 0 {
+        return None;
+    }
     let elapsed_since_base = current_time - track.base_time;
     let time_in_cycle = elapsed_since_base.rem_euclid(event.cycle_duration);
 
@@ -296,5 +319,58 @@ pub fn toggle_oneshot_tracking(track_name: &str, event_name: &str) {
         config.oneshot_events.remove(&event_id);
     } else {
         config.oneshot_events.insert(event_id);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::json_loader::{EventColor, TimelineType};
+
+    fn event(cycle_duration: i64) -> TimelineEvent {
+        TimelineEvent {
+            name: "Event".into(),
+            start_offset: 0,
+            duration: 300,
+            cycle_duration,
+            color: EventColor::default(),
+            copy_text: String::new(),
+            enabled: true,
+        }
+    }
+
+    fn upcoming(seconds_until: i64) -> UpcomingEvent {
+        UpcomingEvent {
+            event_id: TrackedEventId::new("Track", "Event"),
+            start_time: seconds_until,
+            seconds_until,
+            seconds_into: 0,
+            color: [1.0; 4],
+            copy_text: String::new(),
+        }
+    }
+
+    #[test]
+    fn malformed_cycle_is_not_calculated() {
+        let track = EventTrack {
+            name: "Track".into(),
+            timeline_type: TimelineType::RealTime,
+            events: Vec::new(),
+            base_time: 0,
+            visible: true,
+            height: 20.0,
+            category: String::new(),
+        };
+        assert!(calculate_event_timing(&track, &event(0), 100).is_none());
+    }
+
+    #[test]
+    fn upcoming_panel_keeps_only_nearest_occurrence_per_event() {
+        let mut events = HashMap::new();
+        insert_upcoming(&mut events, upcoming(7200));
+        insert_upcoming(&mut events, upcoming(600));
+        insert_upcoming(&mut events, upcoming(3600));
+        assert_eq!(events.len(), 1);
+        assert_eq!(events.values().next().unwrap().seconds_until, 600);
     }
 }

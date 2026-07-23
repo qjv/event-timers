@@ -1,6 +1,10 @@
 use nexus::paths::get_addon_dir;
 use serde::{Deserialize, Serialize};
-use std::{fs, path::PathBuf, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    fs,
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 // Embedded fallback JSON
 const EMBEDDED_JSON: &str = include_str!("../event_tracks.json");
@@ -17,7 +21,12 @@ pub struct EventColor {
 
 impl Default for EventColor {
     fn default() -> Self {
-        Self { r: 0.2, g: 0.6, b: 0.8, a: 1.0 }
+        Self {
+            r: 0.2,
+            g: 0.6,
+            b: 0.8,
+            a: 1.0,
+        }
     }
 }
 
@@ -25,9 +34,14 @@ impl EventColor {
     pub fn to_array(&self) -> [f32; 4] {
         [self.r, self.g, self.b, self.a]
     }
-    
+
     pub fn from_array(arr: [f32; 4]) -> Self {
-        Self { r: arr[0], g: arr[1], b: arr[2], a: arr[3] }
+        Self {
+            r: arr[0],
+            g: arr[1],
+            b: arr[2],
+            a: arr[3],
+        }
     }
 }
 
@@ -52,7 +66,9 @@ pub struct TimelineEvent {
     pub enabled: bool,
 }
 
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 impl Default for TimelineEvent {
     fn default() -> Self {
@@ -82,7 +98,9 @@ pub struct EventTrack {
     pub category: String,
 }
 
-fn default_height() -> f32 { 40.0 }
+fn default_height() -> f32 {
+    40.0
+}
 
 impl Default for EventTrack {
     fn default() -> Self {
@@ -149,15 +167,15 @@ fn calculate_tyria_base_time() -> i64 {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs() as i64;
-    
+
     // Reference: 2025-09-30 17:00:00 UTC-3 = Tyrian 00:00
     let reference_time: i64 = 1759262400;
     let cycle_duration = 120 * 60; // 120 minutes in seconds
-    
+
     let time_since_reference = current_time - reference_time;
     let cycles_elapsed = time_since_reference / cycle_duration;
     let current_cycle_start = reference_time + (cycles_elapsed * cycle_duration);
-    
+
     current_cycle_start
 }
 
@@ -174,8 +192,8 @@ fn calculate_local_day_start_time() -> i64 {
     let seconds_per_day = 24 * 60 * 60;
     let timezone_offset = -3 * 60 * 60; // UTC-3
 
-    let seconds_since_local_midnight = (current_utc_timestamp + timezone_offset)
-        .rem_euclid(seconds_per_day);
+    let seconds_since_local_midnight =
+        (current_utc_timestamp + timezone_offset).rem_euclid(seconds_per_day);
 
     current_utc_timestamp - seconds_since_local_midnight
 }
@@ -186,7 +204,10 @@ fn get_base_time_from_calculator(calculator: &str) -> i64 {
         "cantha_cycle" => calculate_cantha_base_time(),
         "local_day_start" => calculate_local_day_start_time(),
         _ => {
-            eprintln!("Unknown base_time_calculator: {}, using local_day_start", calculator);
+            eprintln!(
+                "Unknown base_time_calculator: {}, using local_day_start",
+                calculator
+            );
             calculate_local_day_start_time()
         }
     }
@@ -195,6 +216,9 @@ fn get_base_time_from_calculator(calculator: &str) -> i64 {
 // === Event Expansion ===
 
 fn expand_schedule(schedule: &JsonSchedule, cycle_minutes: i32) -> Vec<TimelineEvent> {
+    if cycle_minutes <= 0 || schedule.duration <= 0 {
+        return Vec::new();
+    }
     if schedule.interval == 0 {
         // Single event, no repetition
         return vec![TimelineEvent {
@@ -207,23 +231,28 @@ fn expand_schedule(schedule: &JsonSchedule, cycle_minutes: i32) -> Vec<TimelineE
             enabled: true,
         }];
     }
-    
+
+    if schedule.interval < 0 {
+        return Vec::new();
+    }
+
     // Repeating event
-    let repetitions = cycle_minutes / schedule.interval;
-    (0..repetitions)
-        .map(|i| {
-            let spawn_time = schedule.offset + i * schedule.interval;
-            TimelineEvent {
-                name: schedule.name.clone(),
-                start_offset: (spawn_time * 60) as i64,
-                duration: (schedule.duration * 60) as i64,
-                cycle_duration: (cycle_minutes * 60) as i64,
-                color: EventColor::from_array(schedule.color),
-                copy_text: schedule.copy_text.clone(),
-                enabled: true,
-            }
-        })
-        .collect()
+    let phase = schedule.offset.rem_euclid(schedule.interval);
+    let mut events = Vec::new();
+    let mut spawn_time = phase;
+    while spawn_time < cycle_minutes {
+        events.push(TimelineEvent {
+            name: schedule.name.clone(),
+            start_offset: (spawn_time * 60) as i64,
+            duration: (schedule.duration * 60) as i64,
+            cycle_duration: (cycle_minutes * 60) as i64,
+            color: EventColor::from_array(schedule.color),
+            copy_text: schedule.copy_text.clone(),
+            enabled: true,
+        });
+        spawn_time += schedule.interval;
+    }
+    events
 }
 
 // === JSON Loading ===
@@ -247,7 +276,7 @@ fn extract_embedded_json() {
 fn load_json_content() -> String {
     // First, ensure embedded JSON is extracted
     extract_embedded_json();
-    
+
     if let Some(path) = get_json_path() {
         if path.exists() {
             if let Ok(content) = fs::read_to_string(&path) {
@@ -255,37 +284,39 @@ fn load_json_content() -> String {
             }
         }
     }
-    
+
     // Fallback to embedded JSON
     EMBEDDED_JSON.to_string()
 }
 
 pub fn load_tracks_from_json() -> (Vec<EventTrack>, Vec<String>) {
     let json_content = load_json_content();
-    
-    match serde_json::from_str::<JsonRoot>(&json_content) {
+
+    match serde_json::from_str::<JsonRoot>(&json_content)
+        .or_else(|_| serde_json::from_str::<JsonRoot>(EMBEDDED_JSON))
+    {
         Ok(root) => {
             let mut all_tracks = Vec::new();
             let mut category_names = Vec::new();
-            
+
             for category in root.categories {
                 category_names.push(category.name.clone());
-                
+
                 for json_track in category.tracks {
                     let base_time = get_base_time_from_calculator(&json_track.base_time_calculator);
-                    
+
                     let mut events = json_track.events;
-                    
+
                     // Expand schedules into events
                     for schedule in &json_track.schedules {
                         let cycle_minutes = match json_track.base_time_calculator.as_str() {
-                            "tyria_cycle" | "cantha_cycle" => 2 * 60,  // 2 hours
-                            "local_day_start" => 24 * 60,              // 24 hours
+                            "tyria_cycle" | "cantha_cycle" => 2 * 60, // 2 hours
+                            "local_day_start" => 24 * 60,             // 24 hours
                             _ => 24 * 60,
                         };
                         events.extend(expand_schedule(schedule, cycle_minutes));
                     }
-                    
+
                     all_tracks.push(EventTrack {
                         name: json_track.name,
                         timeline_type: json_track.timeline_type,
@@ -297,7 +328,7 @@ pub fn load_tracks_from_json() -> (Vec<EventTrack>, Vec<String>) {
                     });
                 }
             }
-            
+
             (all_tracks, category_names)
         }
         Err(e) => {
@@ -305,5 +336,39 @@ pub fn load_tracks_from_json() -> (Vec<EventTrack>, Vec<String>) {
             eprintln!("Using empty track list");
             (Vec::new(), Vec::new())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn schedule(offset: i32, interval: i32, duration: i32) -> JsonSchedule {
+        JsonSchedule {
+            name: "Test".into(),
+            offset,
+            interval,
+            duration,
+            color: [1.0; 4],
+            copy_text: String::new(),
+        }
+    }
+
+    #[test]
+    fn repeating_schedule_wraps_its_phase_across_the_day() {
+        let events = expand_schedule(&schedule(1090, 120, 25), 1440);
+        assert_eq!(events.len(), 12);
+        assert_eq!(events.first().unwrap().start_offset, 10 * 60);
+        assert_eq!(events.last().unwrap().start_offset, 1330 * 60);
+        assert!(events
+            .iter()
+            .all(|event| event.duration == 25 * 60 && event.cycle_duration == 1440 * 60));
+    }
+
+    #[test]
+    fn invalid_repeating_schedules_are_ignored() {
+        assert!(expand_schedule(&schedule(0, -1, 5), 1440).is_empty());
+        assert!(expand_schedule(&schedule(0, 15, 0), 1440).is_empty());
+        assert!(expand_schedule(&schedule(0, 15, 5), 0).is_empty());
     }
 }

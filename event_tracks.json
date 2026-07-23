@@ -1,5 +1,5 @@
 {
-  "version": "1.1.4",
+  "version": "1.1.6",
   "hash": "",
   "categories": [
       {
@@ -9,7 +9,7 @@
           "name": "Halloween",
           "timeline_type": "real_time",
           "base_time_calculator": "local_day_start",
-          "visible": true,
+          "visible": false,
           "height": 20,
           "schedules": [
             {
@@ -24,6 +24,106 @@
                 1
               ],
               "copy_text": "[&BBAEAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Dragon Bash Hologram Stampede",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": false,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Wayfarer Foothills",
+              "offset": 0,
+              "interval": 60,
+              "duration": 5,
+              "color": [0.259, 0.784, 0.843, 1],
+              "copy_text": "[&BH0BAAA=]"
+            },
+            {
+              "name": "Dredgehaunt Cliffs",
+              "offset": 15,
+              "interval": 60,
+              "duration": 5,
+              "color": [0.259, 0.784, 0.843, 1],
+              "copy_text": "[&BGMCAAA=]"
+            },
+            {
+              "name": "Lornar's Pass",
+              "offset": 30,
+              "interval": 60,
+              "duration": 5,
+              "color": [0.259, 0.784, 0.843, 1],
+              "copy_text": "[&BJkBAAA=]"
+            },
+            {
+              "name": "Snowden Drifts",
+              "offset": 45,
+              "interval": 60,
+              "duration": 5,
+              "color": [0.259, 0.784, 0.843, 1],
+              "copy_text": "[&BL4AAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Festival of the Four Winds — Labyrinthine Cliffs",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": false,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Skiff Race",
+              "offset": 60,
+              "interval": 120,
+              "duration": 10,
+              "color": [0.259, 0.784, 0.843, 1],
+              "copy_text": "[&BBwHAAA=]"
+            },
+            {
+              "name": "Water Balloons",
+              "offset": 75,
+              "interval": 120,
+              "duration": 10,
+              "color": [0.259, 0.784, 0.843, 1],
+              "copy_text": "[&BBwHAAA=]"
+            },
+            {
+              "name": "Treasure Hunt",
+              "offset": 90,
+              "interval": 120,
+              "duration": 30,
+              "color": [0.259, 0.784, 0.843, 1],
+              "copy_text": "[&BBwHAAA=]"
+            },
+            {
+              "name": "Skimmer Race",
+              "offset": 135,
+              "interval": 120,
+              "duration": 10,
+              "color": [0.259, 0.784, 0.843, 1],
+              "copy_text": "[&BBwHAAA=]"
+            },
+            {
+              "name": "Fishing Tournament",
+              "offset": 150,
+              "interval": 120,
+              "duration": 10,
+              "color": [0.259, 0.784, 0.843, 1],
+              "copy_text": "[&BBwHAAA=]"
+            },
+            {
+              "name": "Flying Dolyak Race",
+              "offset": 165,
+              "interval": 120,
+              "duration": 10,
+              "color": [0.259, 0.784, 0.843, 1],
+              "copy_text": "[&BBwHAAA=]"
             }
           ],
           "events": []
@@ -1733,9 +1833,9 @@
           "schedules": [
             {
               "name": "Shackles of the Ancients",
-              "offset": 1095,
+              "offset": 1090,
               "interval": 120,
-              "duration": 20,
+              "duration": 25,
               "color": [
                 0.18,
                 0.78,
