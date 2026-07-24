@@ -1833,7 +1833,7 @@
           "schedules": [
             {
               "name": "Shackles of the Ancients",
-              "offset": 1090,
+              "offset": 1095,
               "interval": 120,
               "duration": 25,
               "color": [
