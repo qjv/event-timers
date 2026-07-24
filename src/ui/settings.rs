@@ -15,6 +15,27 @@ use crate::notifications::NOTIFICATION_STATE;
 const GITHUB_EVENT_TRACKS_URL: &str =
     "https://raw.githubusercontent.com/qjv/event-timers/main/event_tracks.json";
 
+fn event_tracks_version(content: &str) -> Option<[u64; 3]> {
+    let value: serde_json::Value = serde_json::from_str(content).ok()?;
+    let mut parts = value.get("version")?.as_str()?.split('.');
+    Some([
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+    ])
+}
+
+fn event_tracks_needs_update(local_content: &str, remote_content: &str) -> bool {
+    match (
+        event_tracks_version(local_content),
+        event_tracks_version(remote_content),
+    ) {
+        (Some(local), Some(remote)) => remote > local,
+        (None, Some(_)) => local_content != remote_content,
+        _ => false,
+    }
+}
+
 pub fn check_for_event_tracks_update() {
     use std::thread;
 
@@ -52,7 +73,10 @@ pub fn check_for_event_tracks_update() {
                             if let Some(path) = local_path {
                                 let needs_update = if path.exists() {
                                     match std::fs::read_to_string(&path) {
-                                        Ok(local_content) => local_content != github_content,
+                                        Ok(local_content) => event_tracks_needs_update(
+                                            &local_content,
+                                            &github_content,
+                                        ),
                                         Err(_) => true,
                                     }
                                 } else {
@@ -789,7 +813,7 @@ pub fn render_settings(ui: &Ui) {
                     if completed {
                         let min = ui.item_rect_min();
                         let max = ui.item_rect_max();
-                        ui.get_window_draw_list()
+                        draw_list
                             .add_line(
                                 [min[0], (min[1] + max[1]) * 0.5],
                                 [max[0], (min[1] + max[1]) * 0.5],
@@ -1371,4 +1395,23 @@ fn render_event_editor(ui: &Ui, event: &mut TimelineEvent) {
     }
 
     ui.checkbox("Enabled", &mut event.enabled);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::event_tracks_needs_update;
+
+    #[test]
+    fn schedule_updater_never_downgrades_a_local_test_version() {
+        let local = r#"{"version":"1.1.6"}"#;
+        let remote = r#"{"version":"1.1.4"}"#;
+        assert!(!event_tracks_needs_update(local, remote));
+    }
+
+    #[test]
+    fn schedule_updater_accepts_a_newer_remote_version() {
+        let local = r#"{"version":"1.1.6"}"#;
+        let remote = r#"{"version":"1.1.7"}"#;
+        assert!(event_tracks_needs_update(local, remote));
+    }
 }

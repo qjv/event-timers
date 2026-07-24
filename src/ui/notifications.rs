@@ -350,7 +350,7 @@ pub fn render_upcoming_panel(ui: &Ui) {
                     ui.text_colored([0.52, 0.52, 0.52, 1.0], &event.event_id.event_name);
                     let min = ui.item_rect_min();
                     let max = ui.item_rect_max();
-                    ui.get_window_draw_list()
+                    draw_list
                         .add_line(
                             [min[0], (min[1] + max[1]) * 0.5],
                             [max[0], (min[1] + max[1]) * 0.5],

@@ -1008,6 +1008,7 @@ fn render_timeline_track(
                 .get(&track.name)
                 .is_some_and(|set| set.contains(event.name.as_str()))
         });
+        let completed = crate::completion::is_completed(&track.name, &event.name);
 
         let time_in_cycle = elapsed_since_base.rem_euclid(event.cycle_duration);
         let event_start_in_cycle = event.start_offset;
@@ -1042,7 +1043,7 @@ fn render_timeline_track(
                 && time_in_cycle < event.start_offset + event.duration;
             let is_this_occurrence_active = is_active && time_offset == time_to_event_start;
 
-            let bar_color = if is_this_occurrence_active {
+            let mut bar_color = if is_this_occurrence_active {
                 event.color.to_array()
             } else {
                 [
@@ -1052,6 +1053,14 @@ fn render_timeline_track(
                     event.color.a,
                 ]
             };
+            if completed {
+                bar_color = [
+                    bar_color[0] * 0.45,
+                    bar_color[1] * 0.45,
+                    bar_color[2] * 0.45,
+                    bar_color[3],
+                ];
+            }
 
             let bar_min = [event_start_x.max(cursor_pos[0]), cursor_pos[1]];
             let bar_max = [
@@ -1115,13 +1124,32 @@ fn render_timeline_track(
             ];
 
             draw_list.with_clip_rect(text_clip_min, text_clip_max, || {
-                let text_color = get_text_color_for_bg(bar_color);
+                let text_color = if completed {
+                    [0.72, 0.72, 0.72, 1.0]
+                } else {
+                    get_text_color_for_bg(bar_color)
+                };
                 let text_size = ui.calc_text_size(&event.name);
                 let text_pos = [
                     event_start_x + 5.0,
                     cursor_pos[1] + (track_height - text_size[1]) / 2.0,
                 ];
                 draw_list.add_text(text_pos, text_color, &event.name);
+                if completed {
+                    let strike_start = text_pos[0].max(text_clip_min[0]);
+                    let strike_end = (text_pos[0] + text_size[0]).min(text_clip_max[0]);
+                    if strike_end > strike_start {
+                        let strike_y = text_pos[1] + text_size[1] * 0.5;
+                        draw_list
+                            .add_line(
+                                [strike_start, strike_y],
+                                [strike_end, strike_y],
+                                [0.82, 0.82, 0.82, 0.95],
+                            )
+                            .thickness(1.5)
+                            .build();
+                    }
+                }
             });
         }
     }

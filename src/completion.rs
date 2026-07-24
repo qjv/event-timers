@@ -116,6 +116,8 @@ fn completion_token(track_name: &str, event_name: &str) -> Option<&'static str> 
         ("Dragon's Stand", "Advancing on the Blighting Towers") => {
             Some("mapchest:dragons_stand_heros_choice_chest")
         }
+        ("Crystal Oasis", "Choya Piñata") => Some("mapchest:crystal_oasis_heros_choice_chest"),
+        ("Elon Riverlands", "Doppelganger") => Some("mapchest:elon_riverlands_heros_choice_chest"),
         ("Seitung Province", "Aetherblade Assault") => {
             Some("mapchest:seitung_province_heros_choice_chest")
         }
@@ -132,18 +134,30 @@ fn completion_token(track_name: &str, event_name: &str) -> Option<&'static str> 
             Some("mapchest:skywatch_archipelago_heros_choice_chest")
         }
         ("Amnytas", "The Defense of Amnytas") => Some("mapchest:amnytas_heros_choice_chest"),
+        // Deliberately not mapped because one API flag cannot identify which
+        // timetable event awarded the shared daily chest:
+        // - convergence_heros_choice_chest: Outer Nayos or Mount Balrior
+        // - the_desolation_heros_choice_chest: Maws of Torment or Junundu Rising
+        // - domain_of_vabbi_heros_choice_chest: Forged with Fire or Serpent's Ire
+        // - wild_island_heros_choice_chest: Hammerhart Rumble!, Secrets of the
+        //   Weald, or Shackles of the Ancients
+        //
+        // These API flags currently have no corresponding timetable entry:
+        // - citadel_of_zakiros_heros_choice_chest: Into the Spider's Lair
+        // - gyala_delve_heros_choice_chest: Destroy the ravenous wanderer
+        // - inner_nayos_heros_choice_chest: The Road to Heitor or The Fangs That Gnash
         _ => None,
     }
 }
 
 pub fn is_completed(track_name: &str, event_name: &str) -> bool {
-    let settings = SETTINGS.lock();
-    if !settings.enabled {
+    let Some(token) = completion_token(track_name, event_name) else {
+        return false;
+    };
+    if !SETTINGS.lock().enabled {
         return false;
     }
-    drop(settings);
-    completion_token(track_name, event_name)
-        .is_some_and(|token| STATE.lock().completed.contains(token))
+    STATE.lock().completed.contains(token)
 }
 
 fn fetch_ids(
@@ -215,5 +229,30 @@ pub fn refresh_if_needed() {
         (Err(error), _) | (_, Err(error)) => {
             STATE.lock().status = format!("GW2 API error: {error}");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::completion_token;
+
+    #[test]
+    fn completion_tokens_match_expanded_schedule_names() {
+        assert_eq!(
+            completion_token("Bjora Marches", "Champion of the Ice Dragon"),
+            Some("worldboss:drakkar")
+        );
+        assert_eq!(
+            completion_token("Auric Basin", "Battle in Tarir"),
+            Some("mapchest:auric_basin_heros_choice_chest")
+        );
+        assert_eq!(
+            completion_token("Crystal Oasis", "Choya Piñata"),
+            Some("mapchest:crystal_oasis_heros_choice_chest")
+        );
+        assert_eq!(
+            completion_token("Elon Riverlands", "Doppelganger"),
+            Some("mapchest:elon_riverlands_heros_choice_chest")
+        );
     }
 }
