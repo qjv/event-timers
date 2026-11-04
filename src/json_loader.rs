@@ -1,4 +1,6 @@
-use nexus::paths::get_addon_dir;
+use crate::get_addon_dir;
+use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
@@ -7,11 +9,15 @@ use std::{
 };
 
 // Embedded fallback JSON
-const EMBEDDED_JSON: &str = include_str!("../event_tracks.json");
+pub const EMBEDDED_JSON: &str = include_str!("../event_tracks.json");
+
+pub static JSON_LOAD_NOTICE: Lazy<Mutex<Option<String>>> = Lazy::new(|| Mutex::new(None));
+static JSON_WRITE_LOCK: Mutex<()> = Mutex::new(());
+static LOADED_VERSION: Lazy<Mutex<String>> = Lazy::new(|| Mutex::new("unknown".into()));
 
 // === Public Data Structures ===
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct EventColor {
     pub r: f32,
     pub g: f32,
@@ -45,7 +51,7 @@ impl EventColor {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub enum TimelineType {
     #[serde(rename = "real_time")]
     RealTime,
@@ -56,6 +62,8 @@ pub enum TimelineType {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TimelineEvent {
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom_name: Option<String>,
     pub start_offset: i64,
     pub duration: i64,
     pub cycle_duration: i64,
@@ -66,6 +74,15 @@ pub struct TimelineEvent {
     pub enabled: bool,
 }
 
+impl TimelineEvent {
+    pub fn display_name(&self) -> &str {
+        self.custom_name
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or(&self.name)
+    }
+}
+
 fn default_true() -> bool {
     true
 }
@@ -74,6 +91,7 @@ impl Default for TimelineEvent {
     fn default() -> Self {
         Self {
             name: "New Event".to_string(),
+            custom_name: None,
             start_offset: 0,
             duration: 300,
             cycle_duration: 7200,
@@ -160,6 +178,44 @@ struct JsonRoot {
     categories: Vec<JsonCategory>,
 }
 
+pub fn parse_event_tracks_version(content: &str) -> Option<[u64; 3]> {
+    let root: JsonRoot = serde_json::from_str(content).ok()?;
+    if root.categories.is_empty()
+        || root.categories.iter().any(|category| {
+            category.tracks.iter().any(|track| {
+                track
+                    .schedules
+                    .iter()
+                    .any(|schedule| schedule.duration <= 0 || schedule.interval < 0)
+                    || track
+                        .events
+                        .iter()
+                        .any(|event| event.duration <= 0 || event.cycle_duration <= 0)
+            })
+        })
+    {
+        return None;
+    }
+    let mut parts = root.version.split('.');
+    let version = [
+        parts.next()?.parse().ok()?,
+        parts.next()?.parse().ok()?,
+        parts.next().unwrap_or("0").parse().ok()?,
+    ];
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(version)
+}
+
+pub fn is_valid_event_tracks_json(content: &str) -> bool {
+    parse_event_tracks_version(content).is_some()
+}
+
+pub fn current_loaded_version() -> String {
+    LOADED_VERSION.lock().clone()
+}
+
 // === Time Calculators ===
 
 fn calculate_tyria_base_time() -> i64 {
@@ -223,9 +279,10 @@ fn expand_schedule(schedule: &JsonSchedule, cycle_minutes: i32) -> Vec<TimelineE
         // Single event, no repetition
         return vec![TimelineEvent {
             name: schedule.name.clone(),
-            start_offset: (schedule.offset * 60) as i64,
-            duration: (schedule.duration * 60) as i64,
-            cycle_duration: (cycle_minutes * 60) as i64,
+            custom_name: None,
+            start_offset: i64::from(schedule.offset.rem_euclid(cycle_minutes)) * 60,
+            duration: i64::from(schedule.duration) * 60,
+            cycle_duration: i64::from(cycle_minutes) * 60,
             color: EventColor::from_array(schedule.color),
             copy_text: schedule.copy_text.clone(),
             enabled: true,
@@ -243,9 +300,10 @@ fn expand_schedule(schedule: &JsonSchedule, cycle_minutes: i32) -> Vec<TimelineE
     while spawn_time < cycle_minutes {
         events.push(TimelineEvent {
             name: schedule.name.clone(),
-            start_offset: (spawn_time * 60) as i64,
-            duration: (schedule.duration * 60) as i64,
-            cycle_duration: (cycle_minutes * 60) as i64,
+            custom_name: None,
+            start_offset: i64::from(spawn_time) * 60,
+            duration: i64::from(schedule.duration) * 60,
+            cycle_duration: i64::from(cycle_minutes) * 60,
             color: EventColor::from_array(schedule.color),
             copy_text: schedule.copy_text.clone(),
             enabled: true,
@@ -257,31 +315,86 @@ fn expand_schedule(schedule: &JsonSchedule, cycle_minutes: i32) -> Vec<TimelineE
 
 // === JSON Loading ===
 
-fn get_json_path() -> Option<PathBuf> {
+pub fn get_json_path() -> Option<PathBuf> {
     get_addon_dir("event_timers").map(|p| p.join("event_tracks.json"))
 }
 
-fn extract_embedded_json() {
-    if let Some(path) = get_json_path() {
-        // Only extract if file doesn't exist
-        if !path.exists() {
-            if let Some(dir) = path.parent() {
-                fs::create_dir_all(dir).ok();
+pub fn atomic_write_event_tracks(path: &PathBuf, content: &str) -> Result<(), String> {
+    let _write_guard = JSON_WRITE_LOCK.lock();
+    if !is_valid_event_tracks_json(content) {
+        return Err("Refusing to write invalid event_tracks.json content".to_string());
+    }
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+    }
+    // Only back up existing file if it is valid JSON (never overwrite backup with a 429 error!)
+    if path.exists() {
+        if let Ok(existing) = fs::read_to_string(path) {
+            if is_valid_event_tracks_json(&existing) {
+                let backup_path = path.with_extension("json.backup");
+                let _ = fs::copy(path, backup_path);
             }
-            fs::write(&path, EMBEDDED_JSON).ok();
         }
     }
+    let tmp_path = path.with_extension("json.tmp");
+    fs::write(&tmp_path, content).map_err(|e| format!("Failed to write temp file: {e}"))?;
+    fs::OpenOptions::new()
+        .write(true)
+        .open(&tmp_path)
+        .and_then(|file| file.sync_all())
+        .map_err(|e| format!("Failed to flush temp file: {e}"))?;
+    if let Err(err) = fs::rename(&tmp_path, path) {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(format!("Could not replace event_tracks.json: {err}"));
+    }
+    Ok(())
 }
 
 fn load_json_content() -> String {
-    // First, ensure embedded JSON is extracted
-    extract_embedded_json();
+    let embedded_ver = parse_event_tracks_version(EMBEDDED_JSON);
 
     if let Some(path) = get_json_path() {
         if path.exists() {
-            if let Ok(content) = fs::read_to_string(&path) {
-                return content;
+            if let Ok(disk_content) = fs::read_to_string(&path) {
+                match (parse_event_tracks_version(&disk_content), embedded_ver) {
+                    (Some(disk_ver), Some(emb_ver)) if disk_ver >= emb_ver => {
+                        return disk_content;
+                    }
+                    (Some(_disk_ver), Some(_emb_ver)) => {
+                        // Embedded JSON is newer than on-disk JSON! Upgrade on-disk file.
+                        if let Err(err) = atomic_write_event_tracks(&path, EMBEDDED_JSON) {
+                            *JSON_LOAD_NOTICE.lock() =
+                                Some(format!("Using built-in schedule ({err})"));
+                        }
+                        return EMBEDDED_JSON.to_string();
+                    }
+                    (None, _) => {
+                        // On-disk JSON was corrupted (e.g., 429 error text). Recover from backup or embedded.
+                        let backup_path = path.with_extension("json.backup");
+                        if let Ok(backup_content) = fs::read_to_string(&backup_path) {
+                            if let (Some(bak_ver), Some(emb_ver)) =
+                                (parse_event_tracks_version(&backup_content), embedded_ver)
+                            {
+                                if bak_ver > emb_ver {
+                                    let _ = atomic_write_event_tracks(&path, &backup_content);
+                                    *JSON_LOAD_NOTICE.lock() =
+                                        Some("Recovered event_tracks.json from backup".to_string());
+                                    return backup_content;
+                                }
+                            }
+                        }
+                        let _ = atomic_write_event_tracks(&path, EMBEDDED_JSON);
+                        *JSON_LOAD_NOTICE.lock() = Some(
+                            "Repaired corrupted event_tracks.json using built-in schedule"
+                                .to_string(),
+                        );
+                        return EMBEDDED_JSON.to_string();
+                    }
+                    _ => return disk_content,
+                }
             }
+        } else {
+            let _ = atomic_write_event_tracks(&path, EMBEDDED_JSON);
         }
     }
 
@@ -296,6 +409,7 @@ pub fn load_tracks_from_json() -> (Vec<EventTrack>, Vec<String>) {
         .or_else(|_| serde_json::from_str::<JsonRoot>(EMBEDDED_JSON))
     {
         Ok(root) => {
+            *LOADED_VERSION.lock() = root.version.clone();
             let mut all_tracks = Vec::new();
             let mut category_names = Vec::new();
 
@@ -370,5 +484,50 @@ mod tests {
         assert!(expand_schedule(&schedule(0, -1, 5), 1440).is_empty());
         assert!(expand_schedule(&schedule(0, 15, 0), 1440).is_empty());
         assert!(expand_schedule(&schedule(0, 15, 5), 0).is_empty());
+    }
+
+    #[test]
+    fn rejects_rate_limit_error_page_as_event_tracks_json() {
+        assert!(!is_valid_event_tracks_json("429: Too Many Requests"));
+        assert!(!is_valid_event_tracks_json(
+            r#"{"version":"1.2.0","categories":[]}"#
+        ));
+        assert!(is_valid_event_tracks_json(EMBEDDED_JSON));
+    }
+
+    #[test]
+    fn schedule_replacement_preserves_valid_backup_and_rejects_error_pages() {
+        let dir =
+            std::env::temp_dir().join(format!("event-timers-json-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("event_tracks.json");
+        fs::write(&path, EMBEDDED_JSON).unwrap();
+        assert!(atomic_write_event_tracks(&path, "429: Too Many Requests").is_err());
+        assert_eq!(fs::read_to_string(&path).unwrap(), EMBEDDED_JSON);
+        atomic_write_event_tracks(&path, EMBEDDED_JSON).unwrap();
+        assert_eq!(
+            fs::read_to_string(path.with_extension("json.backup")).unwrap(),
+            EMBEDDED_JSON
+        );
+        fs::write(&path, "429: Too Many Requests").unwrap();
+        atomic_write_event_tracks(&path, EMBEDDED_JSON).unwrap();
+        assert_eq!(
+            fs::read_to_string(path.with_extension("json.backup")).unwrap(),
+            EMBEDDED_JSON
+        );
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn rejects_invalid_event_cycles_and_extra_version_components() {
+        let mut json: serde_json::Value = serde_json::from_str(EMBEDDED_JSON).unwrap();
+        json["version"] = "1.2.0.1".into();
+        assert!(!is_valid_event_tracks_json(&json.to_string()));
+        json["version"] = "1.2.0".into();
+        json["categories"][0]["tracks"][0]["events"] = serde_json::json!([{
+            "name": "Invalid", "start_offset": 0, "duration": 60, "cycle_duration": 0,
+            "color": { "r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0 }
+        }]);
+        assert!(!is_valid_event_tracks_json(&json.to_string()));
     }
 }

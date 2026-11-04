@@ -1,5 +1,5 @@
 {
-  "version": "1.1.7",
+  "version": "1.2.0",
   "hash": "",
   "categories": [
       {
@@ -21,6 +21,19 @@
                 0.890,
                 0.259,
                 0.008,
+                1
+              ],
+              "copy_text": "[&BBAEAAA=]"
+            },
+            {
+              "name": "Mad King's Labyrinth Race",
+              "offset": 15,
+              "interval": 30,
+              "duration": 5,
+              "color": [
+                0.65,
+                0.35,
+                0.85,
                 1
               ],
               "copy_text": "[&BBAEAAA=]"
@@ -124,6 +137,86 @@
               "duration": 10,
               "color": [0.259, 0.784, 0.843, 1],
               "copy_text": "[&BBwHAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Festival of the Four Winds — Crown Pavilion",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": false,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Boss Blitz",
+              "offset": 0,
+              "interval": 30,
+              "duration": 20,
+              "color": [0.95, 0.65, 0.15, 1],
+              "copy_text": "[&BCgDAAA=]"
+            },
+            {
+              "name": "Pavilion Race",
+              "offset": 20,
+              "interval": 30,
+              "duration": 10,
+              "color": [0.35, 0.78, 0.90, 1],
+              "copy_text": "[&BCgDAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Wintersday",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": false,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Divinity's Reach Mount Race",
+              "offset": 10,
+              "interval": 30,
+              "duration": 10,
+              "color": [0.55, 0.85, 1.0, 1],
+              "copy_text": "[&BCgDAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Lunar New Year",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": false,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Divinity's Reach New Year's Race",
+              "offset": 5,
+              "interval": 30,
+              "duration": 10,
+              "color": [0.92, 0.22, 0.22, 1],
+              "copy_text": "[&BCgDAAA=]"
+            }
+          ],
+          "events": []
+        },
+        {
+          "name": "Super Adventure Festival",
+          "timeline_type": "real_time",
+          "base_time_calculator": "local_day_start",
+          "visible": false,
+          "height": 20,
+          "schedules": [
+            {
+              "name": "Super Adventure Box Stampede",
+              "offset": 0,
+              "interval": 60,
+              "duration": 15,
+              "color": [0.35, 0.65, 1.0, 1],
+              "copy_text": "[&BLQEAAA=]"
             }
           ],
           "events": []

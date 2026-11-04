@@ -1,4 +1,4 @@
-use nexus::paths::get_addon_dir;
+use crate::get_addon_dir;
 use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -9,7 +9,7 @@ use std::{
     path::PathBuf,
 };
 
-use crate::json_loader::{load_tracks_from_json, EventTrack};
+use crate::json_loader::{load_tracks_from_json, EventColor, EventTrack};
 
 // === Notification Types ===
 
@@ -34,14 +34,10 @@ impl TrackedEventId {
             event_name: event_name.to_string(),
         }
     }
-
-    pub fn display_name(&self) -> String {
-        format!("{}: {}", self.track_name, self.event_name)
-    }
 }
 
 /// Toast notification position anchor
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToastPosition {
     TopRight,
     TopLeft,
@@ -52,6 +48,75 @@ pub enum ToastPosition {
 impl Default for ToastPosition {
     fn default() -> Self {
         Self::TopRight
+    }
+}
+
+/// Which events populate the Upcoming Events panel
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpcomingPanelMode {
+    TrackedOnly,
+    TrackedAndFavorites,
+    AllVisibleEvents,
+}
+
+impl Default for UpcomingPanelMode {
+    fn default() -> Self {
+        Self::TrackedOnly
+    }
+}
+
+impl UpcomingPanelMode {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::TrackedOnly => "Tracked Only",
+            Self::TrackedAndFavorites => "Tracked + Favorites",
+            Self::AllVisibleEvents => "All Visible Events",
+        }
+    }
+}
+
+/// How event bars are colored in the timeline
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventColorMode {
+    Default,
+    CategoryExpansion,
+    MonochromeHighlight,
+}
+
+impl Default for EventColorMode {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
+impl EventColorMode {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Default => "Default (Per-Event)",
+            Self::CategoryExpansion => "By Expansion / Category",
+            Self::MonochromeHighlight => "Monochrome (Highlight Tracked & Favorites)",
+        }
+    }
+}
+
+pub fn category_expansion_color(category: &str) -> [f32; 4] {
+    match category {
+        "Seasonal Events" => [0.26, 0.78, 0.85, 1.0], // Festive Cyan
+        "Time Cycles" => [0.55, 0.68, 0.88, 1.0],     // Sky Blue
+        "Instances" => [0.72, 0.45, 0.88, 1.0],       // Mists Purple
+        "Base Game" => [0.85, 0.32, 0.28, 1.0],       // Core Krytan Red
+        "Living World Season 1" => [0.92, 0.48, 0.18, 1.0], // Scarlet Orange
+        "Living World Season 2" => [0.85, 0.68, 0.28, 1.0], // Dry Top Sand Gold
+        "Heart of Thorns" => [0.24, 0.72, 0.34, 1.0], // Maguuma Jungle Green
+        "Living World Season 3" => [0.76, 0.26, 0.48, 1.0], // Bloodstone Crimson
+        "Path of Fire" => [0.88, 0.24, 0.56, 1.0],    // Elonian Magenta
+        "Living World Season 4" => [0.64, 0.34, 0.86, 1.0], // Branded Violet
+        "Icebrood Saga" => [0.28, 0.68, 0.92, 1.0],   // Shiverpeaks Ice Blue
+        "End of Dragons" => [0.14, 0.78, 0.62, 1.0],  // Canthan Jade Teal
+        "Secrets of the Obscure" => [0.92, 0.76, 0.26, 1.0], // Astral Gold
+        "Janthir Wilds" => [0.78, 0.54, 0.26, 1.0],   // Janthir Amber/Ochre
+        "Visions of Eternity" => [0.94, 0.42, 0.26, 1.0], // Castora Coral/Orange
+        _ => [0.45, 0.62, 0.78, 1.0],
     }
 }
 
@@ -115,6 +180,15 @@ pub struct NotificationConfig {
 
     #[serde(default)]
     pub upcoming_panel_enabled: bool,
+
+    #[serde(default)]
+    pub upcoming_panel_mode: UpcomingPanelMode,
+
+    #[serde(default = "default_true")]
+    pub mute_completed_events: bool,
+
+    #[serde(default)]
+    pub hide_completed_in_upcoming: bool,
 
     #[serde(default = "default_reminders")]
     pub reminders: Vec<ReminderConfig>,
@@ -204,6 +278,9 @@ impl Default for NotificationConfig {
         Self {
             toast_enabled: true,
             upcoming_panel_enabled: false,
+            upcoming_panel_mode: UpcomingPanelMode::default(),
+            mute_completed_events: true,
+            hide_completed_in_upcoming: false,
             reminders: default_reminders(),
             toast_duration_seconds: 5.0,
             max_visible_toasts: 3,
@@ -227,7 +304,7 @@ const USER_CONFIG_FILENAME: &str = "user_config.json";
 
 // === Alignment Options ===
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TextAlignment {
     Left,
     Center,
@@ -240,7 +317,7 @@ impl Default for TextAlignment {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LabelColumnPosition {
     None,
     Left,
@@ -255,7 +332,7 @@ impl Default for LabelColumnPosition {
 
 // === Visual Configuration ===
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct TrackVisualConfig {
     #[serde(default = "default_track_bg_color")]
     pub background_color: [f32; 4],
@@ -279,7 +356,31 @@ impl Default for TrackVisualConfig {
     }
 }
 
-// === Track Override ===
+// === Track & Event Overrides ===
+
+#[derive(Serialize, Deserialize, Debug, Clone, Default, PartialEq)]
+pub struct EventOverride {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub custom_name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub copy_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<[f32; 4]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offset_delta_seconds: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration: Option<i64>,
+}
+
+impl EventOverride {
+    pub fn is_empty(&self) -> bool {
+        self.custom_name.is_none()
+            && self.copy_text.is_none()
+            && self.color.is_none()
+            && self.offset_delta_seconds.is_none()
+            && self.duration.is_none()
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct TrackOverride {
@@ -289,6 +390,8 @@ pub struct TrackOverride {
     pub height: Option<f32>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub disabled_events: Vec<String>,
+    #[serde(skip_serializing_if = "HashMap::is_empty", default)]
+    pub event_overrides: HashMap<String, EventOverride>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub visual: Option<TrackVisualConfig>,
 }
@@ -312,6 +415,8 @@ pub struct UserConfig {
     #[serde(default = "default_true")]
     pub show_time_ruler: bool,
     #[serde(default = "default_true")]
+    pub sticky_time_ruler: bool,
+    #[serde(default = "default_true")]
     pub show_scrollbar: bool,
     #[serde(default = "default_timeline_width")]
     pub timeline_width: f32,
@@ -327,6 +432,8 @@ pub struct UserConfig {
     pub spacing_between_categories: f32,
     #[serde(default)]
     pub category_order: Vec<String>,
+    #[serde(default)]
+    pub track_order: HashMap<String, Vec<String>>,
     #[serde(default = "default_global_track_bg")]
     pub global_track_background: [f32; 4],
     #[serde(default)]
@@ -335,6 +442,8 @@ pub struct UserConfig {
     pub override_all_track_heights: bool,
     #[serde(default = "default_height")]
     pub global_track_height: f32,
+    #[serde(default)]
+    pub event_color_mode: EventColorMode,
     #[serde(default)]
     pub draw_event_borders: bool,
     #[serde(default = "default_border_color")]
@@ -489,6 +598,7 @@ impl Default for UserConfig {
             is_window_locked: false,
             hide_background: false,
             show_time_ruler: true,
+            sticky_time_ruler: true,
             show_scrollbar: true,
             timeline_width: 800.0,
             view_range_seconds: 3600.0,
@@ -497,10 +607,12 @@ impl Default for UserConfig {
             spacing_same_category: 0.0,
             spacing_between_categories: 0.0,
             category_order: Vec::new(),
+            track_order: HashMap::new(),
             global_track_background: [0.2, 0.2, 0.2, 0.2],
             global_track_padding: 0.0,
             override_all_track_heights: false,
             global_track_height: default_height(),
+            event_color_mode: EventColorMode::Default,
             draw_event_borders: true,
             event_border_color: [0.0, 0.0, 0.0, 1.0],
             event_border_thickness: 1.0,
@@ -539,6 +651,7 @@ pub struct RuntimeConfig {
     pub is_window_locked: bool,
     pub hide_background: bool,
     pub show_time_ruler: bool,
+    pub sticky_time_ruler: bool,
     pub show_scrollbar: bool,
     pub timeline_width: f32,
     pub view_range_seconds: f32,
@@ -547,10 +660,12 @@ pub struct RuntimeConfig {
     pub spacing_same_category: f32,
     pub spacing_between_categories: f32,
     pub category_order: Vec<String>,
+    pub track_order: HashMap<String, Vec<String>>,
     pub global_track_background: [f32; 4],
     pub global_track_padding: f32,
     pub override_all_track_heights: bool,
     pub global_track_height: f32,
+    pub event_color_mode: EventColorMode,
     pub draw_event_borders: bool,
     pub event_border_color: [f32; 4],
     pub event_border_thickness: f32,
@@ -580,6 +695,21 @@ pub struct RuntimeConfig {
     pub notification_config: NotificationConfig,
 }
 
+impl RuntimeConfig {
+    pub fn event_display_name(&self, track_name: &str, event_name: &str) -> String {
+        for track in &self.tracks {
+            if track.name == track_name {
+                for event in &track.events {
+                    if event.name == event_name {
+                        return event.display_name().to_string();
+                    }
+                }
+            }
+        }
+        event_name.to_string()
+    }
+}
+
 impl Default for RuntimeConfig {
     fn default() -> Self {
         let (tracks, categories) = load_tracks_from_json();
@@ -590,7 +720,8 @@ impl Default for RuntimeConfig {
             show_main_window: false,
             is_window_locked: false,
             hide_background: false,
-            show_time_ruler: false,
+            show_time_ruler: true,
+            sticky_time_ruler: true,
             show_scrollbar: true,
             timeline_width: 800.0,
             view_range_seconds: 3600.0,
@@ -599,10 +730,12 @@ impl Default for RuntimeConfig {
             spacing_same_category: 0.0,
             spacing_between_categories: 0.0,
             category_order: Vec::new(),
+            track_order: HashMap::new(),
             global_track_background: [0.2, 0.2, 0.2, 0.2],
             global_track_padding: 0.0,
             override_all_track_heights: false,
             global_track_height: default_height(),
+            event_color_mode: EventColorMode::Default,
             draw_event_borders: true,
             event_border_color: [0.0, 0.0, 0.0, 1.0],
             event_border_thickness: 1.0,
@@ -643,25 +776,21 @@ static LAST_SAVED_CONFIG: Lazy<Mutex<Option<Vec<u8>>>> = Lazy::new(|| Mutex::new
 // === Configuration Management ===
 
 pub fn apply_user_overrides() {
-    // Load fresh tracks from JSON (outside locks)
     let (default_tracks, categories) = load_tracks_from_json();
 
-    // Scope 1: Clean up user config
-    let (cleaned_custom_tracks, user_settings) = {
+    let (cleaned_custom_tracks, user_snapshot) = {
         let mut user_cfg = USER_CONFIG.lock();
 
-        // Deduplicate custom tracks by name (keep first occurrence)
         let mut seen_custom_track_names: HashSet<String> = HashSet::new();
         user_cfg.custom_tracks.retain(|track| {
             if seen_custom_track_names.contains(&track.name) {
-                false // Remove duplicate
+                false
             } else {
                 seen_custom_track_names.insert(track.name.clone());
-                true // Keep first occurrence
+                true
             }
         });
 
-        // Remove custom tracks that now exist in default JSON
         let default_track_names: HashSet<String> =
             default_tracks.iter().map(|t| t.name.clone()).collect();
 
@@ -669,66 +798,18 @@ pub fn apply_user_overrides() {
             .custom_tracks
             .retain(|track| !default_track_names.contains(&track.name));
 
-        // Clone data we need (releases lock early)
-        (
-            user_cfg.custom_tracks.clone(),
-            (
-                user_cfg.track_overrides.clone(),
-                user_cfg.category_visibility.clone(),
-                user_cfg.show_main_window,
-                user_cfg.is_window_locked,
-                user_cfg.hide_background,
-                user_cfg.show_time_ruler,
-                user_cfg.show_scrollbar,
-                user_cfg.timeline_width,
-                user_cfg.view_range_seconds,
-                user_cfg.current_time_position,
-                user_cfg.show_category_headers,
-                user_cfg.spacing_same_category,
-                user_cfg.spacing_between_categories,
-                user_cfg.category_order.clone(),
-                user_cfg.global_track_background,
-                user_cfg.global_track_padding,
-                user_cfg.override_all_track_heights,
-                user_cfg.global_track_height,
-                user_cfg.draw_event_borders,
-                user_cfg.event_border_color,
-                user_cfg.event_border_thickness,
-                user_cfg.category_header_alignment,
-                user_cfg.category_header_padding,
-                user_cfg.label_column_position,
-                user_cfg.label_column_width,
-                user_cfg.label_column_show_category,
-                user_cfg.label_column_show_track,
-                user_cfg.label_column_text_size,
-                user_cfg.label_column_bg_color,
-                user_cfg.label_column_text_color,
-                user_cfg.label_column_category_color,
-                user_cfg.close_on_escape,
-                user_cfg.copy_with_event_name,
-                user_cfg.show_quick_access_icon,
-                user_cfg.time_ruler_interval,
-                user_cfg.time_ruler_show_current_time,
-                user_cfg.tracked_events.clone(),
-                user_cfg.favorite_events.clone(),
-                user_cfg.oneshot_events.clone(),
-                user_cfg.notification_config.clone(),
-                user_cfg.setup_onboarding_seen,
-            ),
-        )
-    }; // user_cfg lock dropped here
+        (user_cfg.custom_tracks.clone(), user_cfg.clone())
+    };
 
-    // Scope 2: Update runtime config
     {
         let mut runtime = RUNTIME_CONFIG.lock();
 
-        // Set runtime tracks to defaults
         runtime.tracks = default_tracks;
         runtime.categories = categories;
 
         // Apply user overrides to default tracks
         for track in &mut runtime.tracks {
-            if let Some(override_data) = user_settings.0.get(&track.name) {
+            if let Some(override_data) = user_snapshot.track_overrides.get(&track.name) {
                 if let Some(visible) = override_data.visible {
                     track.visible = visible;
                 }
@@ -740,6 +821,26 @@ pub fn apply_user_overrides() {
                     if override_data.disabled_events.contains(&event.name) {
                         event.enabled = false;
                     }
+                    if let Some(ev_override) = override_data.event_overrides.get(&event.name) {
+                        if let Some(ref custom_name) = ev_override.custom_name {
+                            if !custom_name.trim().is_empty() {
+                                event.custom_name = Some(custom_name.clone());
+                            }
+                        }
+                        if let Some(ref copy_text) = ev_override.copy_text {
+                            event.copy_text = copy_text.clone();
+                        }
+                        if let Some(color) = ev_override.color {
+                            event.color = EventColor::from_array(color);
+                        }
+                        if let Some(delta) = ev_override.offset_delta_seconds {
+                            event.start_offset = (event.start_offset + delta)
+                                .rem_euclid(event.cycle_duration.max(60));
+                        }
+                        if let Some(duration) = ev_override.duration {
+                            event.duration = duration.max(60);
+                        }
+                    }
                 }
             }
         }
@@ -747,53 +848,87 @@ pub fn apply_user_overrides() {
         // Add cleaned custom tracks
         runtime.tracks.extend(cleaned_custom_tracks);
 
-        // Apply all user settings
-        runtime.category_visibility = user_settings.1;
-        runtime.show_main_window = user_settings.2;
-        runtime.is_window_locked = user_settings.3;
-        runtime.hide_background = user_settings.4;
-        runtime.show_time_ruler = user_settings.5;
-        runtime.show_scrollbar = user_settings.6;
-        runtime.timeline_width = user_settings.7;
-        runtime.view_range_seconds = user_settings.8;
-        runtime.current_time_position = user_settings.9;
-        runtime.show_category_headers = user_settings.10;
-        runtime.spacing_same_category = user_settings.11;
-        runtime.spacing_between_categories = user_settings.12;
-        runtime.category_order = user_settings.13;
-        runtime.global_track_background = user_settings.14;
-        runtime.global_track_padding = user_settings.15;
-        runtime.override_all_track_heights = user_settings.16;
-        runtime.global_track_height = user_settings.17;
-        runtime.draw_event_borders = user_settings.18;
-        runtime.event_border_color = user_settings.19;
-        runtime.event_border_thickness = user_settings.20;
-        runtime.category_header_alignment = user_settings.21;
-        runtime.category_header_padding = user_settings.22;
-        runtime.label_column_position = user_settings.23;
-        runtime.label_column_width = user_settings.24;
-        runtime.label_column_show_category = user_settings.25;
-        runtime.label_column_show_track = user_settings.26;
-        runtime.label_column_text_size = user_settings.27;
-        runtime.label_column_bg_color = user_settings.28;
-        runtime.label_column_text_color = user_settings.29;
-        runtime.label_column_category_color = user_settings.30;
-        runtime.close_on_escape = user_settings.31;
-        runtime.copy_with_event_name = user_settings.32;
-        runtime.show_quick_access_icon = user_settings.33;
-        runtime.time_ruler_interval = user_settings.34;
-        runtime.time_ruler_show_current_time = user_settings.35;
-        runtime.tracked_events = user_settings.36;
-        runtime.favorite_events = user_settings.37;
-        runtime.oneshot_events = user_settings.38;
-        runtime.notification_config = user_settings.39;
-        runtime.setup_onboarding_seen = user_settings.40;
-    } // runtime lock dropped here
+        // Apply saved per-category track ordering
+        if !user_snapshot.track_order.is_empty() {
+            for (category, ordered_names) in &user_snapshot.track_order {
+                let mut cat_tracks: Vec<EventTrack> = Vec::new();
+                let mut indices: Vec<usize> = Vec::new();
+                for (i, t) in runtime.tracks.iter().enumerate() {
+                    if &t.category == category {
+                        indices.push(i);
+                        cat_tracks.push(t.clone());
+                    }
+                }
+                if indices.len() > 1 {
+                    cat_tracks.sort_by_key(|t| {
+                        ordered_names
+                            .iter()
+                            .position(|name| name == &t.name)
+                            .unwrap_or(usize::MAX)
+                    });
+                    for (slot, track) in indices.into_iter().zip(cat_tracks) {
+                        runtime.tracks[slot] = track;
+                    }
+                }
+            }
+        }
+
+        runtime.category_visibility = user_snapshot.category_visibility;
+        runtime.show_main_window = user_snapshot.show_main_window;
+        runtime.is_window_locked = user_snapshot.is_window_locked;
+        runtime.hide_background = user_snapshot.hide_background;
+        runtime.show_time_ruler = user_snapshot.show_time_ruler;
+        runtime.sticky_time_ruler = user_snapshot.sticky_time_ruler;
+        runtime.show_scrollbar = user_snapshot.show_scrollbar;
+        runtime.timeline_width = user_snapshot.timeline_width;
+        runtime.view_range_seconds = user_snapshot.view_range_seconds;
+        runtime.current_time_position = user_snapshot.current_time_position;
+        runtime.show_category_headers = user_snapshot.show_category_headers;
+        runtime.spacing_same_category = user_snapshot.spacing_same_category;
+        runtime.spacing_between_categories = user_snapshot.spacing_between_categories;
+        runtime.category_order = user_snapshot.category_order;
+        runtime.track_order = user_snapshot.track_order;
+        runtime.global_track_background = user_snapshot.global_track_background;
+        runtime.global_track_padding = user_snapshot.global_track_padding;
+        runtime.override_all_track_heights = user_snapshot.override_all_track_heights;
+        runtime.global_track_height = user_snapshot.global_track_height;
+        runtime.event_color_mode = user_snapshot.event_color_mode;
+        runtime.draw_event_borders = user_snapshot.draw_event_borders;
+        runtime.event_border_color = user_snapshot.event_border_color;
+        runtime.event_border_thickness = user_snapshot.event_border_thickness;
+        runtime.category_header_alignment = user_snapshot.category_header_alignment;
+        runtime.category_header_padding = user_snapshot.category_header_padding;
+        runtime.label_column_position = user_snapshot.label_column_position;
+        runtime.label_column_width = user_snapshot.label_column_width;
+        runtime.label_column_show_category = user_snapshot.label_column_show_category;
+        runtime.label_column_show_track = user_snapshot.label_column_show_track;
+        runtime.label_column_text_size = user_snapshot.label_column_text_size;
+        runtime.label_column_bg_color = user_snapshot.label_column_bg_color;
+        runtime.label_column_text_color = user_snapshot.label_column_text_color;
+        runtime.label_column_category_color = user_snapshot.label_column_category_color;
+        runtime.close_on_escape = user_snapshot.close_on_escape;
+        runtime.copy_with_event_name = user_snapshot.copy_with_event_name;
+        runtime.show_quick_access_icon = user_snapshot.show_quick_access_icon;
+        runtime.time_ruler_interval = user_snapshot.time_ruler_interval;
+        runtime.time_ruler_show_current_time = user_snapshot.time_ruler_show_current_time;
+        runtime.tracked_events = user_snapshot.tracked_events;
+        runtime.favorite_events = user_snapshot.favorite_events;
+        runtime.oneshot_events = user_snapshot.oneshot_events;
+        runtime.notification_config = user_snapshot.notification_config;
+        runtime.setup_onboarding_seen = user_snapshot.setup_onboarding_seen;
+    }
 }
 
 pub fn extract_user_overrides() {
     let runtime = RUNTIME_CONFIG.lock();
     let mut user_cfg = USER_CONFIG.lock();
+
+    // Preserve any existing visual overrides per track
+    let existing_visuals: HashMap<String, TrackVisualConfig> = user_cfg
+        .track_overrides
+        .iter()
+        .filter_map(|(k, v)| v.visual.clone().map(|vis| (k.clone(), vis)))
+        .collect();
 
     user_cfg.track_overrides.clear();
     user_cfg.custom_tracks.clear();
@@ -802,10 +937,25 @@ pub fn extract_user_overrides() {
     let default_map: HashMap<String, &EventTrack> =
         default_tracks.iter().map(|t| (t.name.clone(), t)).collect();
 
+    // Record current intra-category track ordering
+    let mut current_track_order: HashMap<String, Vec<String>> = HashMap::new();
+    for track in &runtime.tracks {
+        if !track.category.is_empty() {
+            current_track_order
+                .entry(track.category.clone())
+                .or_default()
+                .push(track.name.clone());
+        }
+    }
+    user_cfg.track_order = current_track_order;
+
     for track in &runtime.tracks {
         if let Some(default_track) = default_map.get(&track.name) {
-            let mut override_data = TrackOverride::default();
-            let mut has_changes = false;
+            let mut override_data = TrackOverride {
+                visual: existing_visuals.get(&track.name).cloned(),
+                ..TrackOverride::default()
+            };
+            let mut has_changes = override_data.visual.is_some();
 
             if track.visible != default_track.visible {
                 override_data.visible = Some(track.visible);
@@ -817,10 +967,58 @@ pub fn extract_user_overrides() {
                 has_changes = true;
             }
 
+            let mut seen_disabled: HashSet<String> = HashSet::new();
+            let mut seen_event_override: HashSet<String> = HashSet::new();
+
             for event in &track.events {
-                if !event.enabled {
+                if !event.enabled && seen_disabled.insert(event.name.clone()) {
                     override_data.disabled_events.push(event.name.clone());
                     has_changes = true;
+                }
+
+                if seen_event_override.insert(event.name.clone()) {
+                    if let Some(def_ev) =
+                        default_track.events.iter().find(|de| de.name == event.name)
+                    {
+                        let mut ev_override = EventOverride::default();
+
+                        if let Some(ref custom_name) = event.custom_name {
+                            let trimmed = custom_name.trim();
+                            if !trimmed.is_empty() && trimmed != def_ev.name {
+                                ev_override.custom_name = Some(trimmed.to_string());
+                            }
+                        }
+
+                        if event.copy_text != def_ev.copy_text {
+                            ev_override.copy_text = Some(event.copy_text.clone());
+                        }
+
+                        let c = event.color.to_array();
+                        let dc = def_ev.color.to_array();
+                        if (c[0] - dc[0]).abs() > 0.005
+                            || (c[1] - dc[1]).abs() > 0.005
+                            || (c[2] - dc[2]).abs() > 0.005
+                            || (c[3] - dc[3]).abs() > 0.005
+                        {
+                            ev_override.color = Some(c);
+                        }
+
+                        if event.start_offset != def_ev.start_offset {
+                            ev_override.offset_delta_seconds =
+                                Some(event.start_offset - def_ev.start_offset);
+                        }
+
+                        if event.duration != def_ev.duration {
+                            ev_override.duration = Some(event.duration);
+                        }
+
+                        if !ev_override.is_empty() {
+                            override_data
+                                .event_overrides
+                                .insert(event.name.clone(), ev_override);
+                            has_changes = true;
+                        }
+                    }
                 }
             }
 
@@ -838,6 +1036,7 @@ pub fn extract_user_overrides() {
     user_cfg.is_window_locked = runtime.is_window_locked;
     user_cfg.hide_background = runtime.hide_background;
     user_cfg.show_time_ruler = runtime.show_time_ruler;
+    user_cfg.sticky_time_ruler = runtime.sticky_time_ruler;
     user_cfg.show_scrollbar = runtime.show_scrollbar;
     user_cfg.timeline_width = runtime.timeline_width;
     user_cfg.view_range_seconds = runtime.view_range_seconds;
@@ -850,6 +1049,7 @@ pub fn extract_user_overrides() {
     user_cfg.global_track_padding = runtime.global_track_padding;
     user_cfg.override_all_track_heights = runtime.override_all_track_heights;
     user_cfg.global_track_height = runtime.global_track_height;
+    user_cfg.event_color_mode = runtime.event_color_mode;
     user_cfg.draw_event_borders = runtime.draw_event_borders;
     user_cfg.event_border_color = runtime.event_border_color;
     user_cfg.event_border_thickness = runtime.event_border_thickness;

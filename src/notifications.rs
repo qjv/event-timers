@@ -11,8 +11,8 @@ pub struct ToastNotification {
     pub id: u64,
     /// The event that triggered this notification
     pub event_id: TrackedEventId,
-    /// Timestamp when the event starts (unix seconds)
-    pub event_start_time: i64,
+    /// Display name for the event (respects custom_name override)
+    pub display_name: String,
     /// Time remaining until event (recalculated each frame)
     pub minutes_until: i32,
     /// When this toast was created (for fade timing)
@@ -43,6 +43,8 @@ pub struct NotifiedKey {
 #[derive(Debug, Clone)]
 pub struct UpcomingEvent {
     pub event_id: TrackedEventId,
+    /// Display name for the event (respects custom_name override)
+    pub display_name: String,
     /// Absolute time when event starts
     pub start_time: i64,
     /// Seconds until event starts (0 if active)
@@ -130,6 +132,7 @@ impl NotificationState {
     pub fn mark_event_notified(&mut self, event_id: &TrackedEventId, current_time: i64) {
         self.event_last_notified
             .insert(event_id.clone(), current_time);
+        self.last_toast_time = current_time;
     }
 
     /// Show a preview toast notification
@@ -137,7 +140,7 @@ impl NotificationState {
         let preview = ToastNotification {
             id: self.next_toast_id,
             event_id: TrackedEventId::new("Example Track", "Example Event"),
-            event_start_time: 0,
+            display_name: "Example Event".to_string(),
             minutes_until: 5,
             created_at: std::time::Instant::now(),
             opacity: 1.0,
@@ -167,10 +170,11 @@ impl NotificationState {
     }
 
     /// Add a new toast notification
+    #[allow(clippy::too_many_arguments)]
     pub fn add_toast(
         &mut self,
         event_id: TrackedEventId,
-        event_start_time: i64,
+        display_name: String,
         minutes_until: i32,
         copy_text: String,
         reminder_name: String,
@@ -180,7 +184,7 @@ impl NotificationState {
         let toast = ToastNotification {
             id: self.next_toast_id,
             event_id,
-            event_start_time,
+            display_name,
             minutes_until,
             created_at: std::time::Instant::now(),
             opacity: 1.0,
@@ -307,6 +311,10 @@ impl NotificationState {
 
     pub fn set_refresh_time(&mut self, current_time: i64) {
         self.last_refresh_time = current_time;
+    }
+
+    pub fn force_refresh(&mut self) {
+        self.last_refresh_time = 0;
     }
 }
 

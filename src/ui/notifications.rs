@@ -2,7 +2,8 @@ use nexus::imgui::{
     Condition, MenuItem, MouseButton, StyleColor, StyleVar, Ui, Window, WindowFlags,
 };
 
-use crate::config::{NotificationConfig, ToastPosition, RUNTIME_CONFIG};
+use crate::config::{NotificationConfig, ToastPosition, UpcomingPanelMode, RUNTIME_CONFIG};
+use crate::notification_logic::{toggle_event_favorite, toggle_event_tracking};
 use crate::notifications::{ToastNotification, NOTIFICATION_STATE};
 use crate::time_utils::format_time_only;
 
@@ -40,7 +41,6 @@ fn calculate_toast_position(
     }
 }
 
-/// Result from rendering a toast: (clicked_to_copy, dismissed)
 struct ToastAction {
     copy_clicked: bool,
     dismissed: bool,
@@ -83,21 +83,18 @@ fn render_single_toast(
             let button_x = window_pos[0] + size[0] - button_size - button_margin;
             let button_y = window_pos[1] + button_margin;
 
-            // Check if mouse is over the X button
             let mouse_pos = ui.io().mouse_pos;
             let over_x_button = mouse_pos[0] >= button_x
                 && mouse_pos[0] <= button_x + button_size
                 && mouse_pos[1] >= button_y
                 && mouse_pos[1] <= button_y + button_size;
 
-            // Draw X button background on hover
             let x_color = if over_x_button {
-                [1.0, 0.4, 0.4, 1.0] // Red on hover
+                [1.0, 0.4, 0.4, 1.0]
             } else {
-                [0.6, 0.6, 0.6, 0.8] // Gray normally
+                [0.6, 0.6, 0.6, 0.8]
             };
 
-            // Draw X
             let x_center = [button_x + button_size / 2.0, button_y + button_size / 2.0];
             let x_half = button_size / 3.0;
             draw_list
@@ -119,7 +116,7 @@ fn render_single_toast(
 
             // Event name (title)
             ui.set_window_font_scale(scale);
-            ui.text_colored(config.toast_title_color, &toast.event_id.event_name);
+            ui.text_colored(config.toast_title_color, &toast.display_name);
 
             // Track name
             ui.set_window_font_scale(scale * 0.85);
@@ -128,13 +125,10 @@ fn render_single_toast(
             // Reminder message and time info
             ui.set_window_font_scale(scale);
             let time_text = if toast.minutes_until > 0 {
-                // Upcoming event: show minutes until
                 format!("{} ({} min)", toast.reminder_name, toast.minutes_until)
             } else if toast.minutes_until < 0 {
-                // Ongoing event: negative value means minutes ago
                 format!("{} ({}m ago)", toast.reminder_name, -toast.minutes_until)
             } else {
-                // Just started (minutes_until == 0)
                 format!("{} (now!)", toast.reminder_name)
             };
             ui.text_colored(toast.reminder_color, &time_text);
@@ -147,12 +141,9 @@ fn render_single_toast(
 
             ui.set_window_font_scale(1.0);
 
-            // Check for click on X button to dismiss
             if over_x_button && ui.is_mouse_clicked(MouseButton::Left) {
                 action.dismissed = true;
-            }
-            // Check for click anywhere else to copy waypoint
-            else if ui.is_window_hovered() && ui.is_mouse_clicked(MouseButton::Left) {
+            } else if ui.is_window_hovered() && ui.is_mouse_clicked(MouseButton::Left) {
                 action.copy_clicked = true;
             }
         });
@@ -208,7 +199,7 @@ pub fn render_toast_notifications(ui: &Ui) {
             let action = render_single_toast(ui, preview, pos, toast_size, &notification_config);
             if action.copy_clicked && !preview.copy_text.is_empty() {
                 let copy_text = if copy_with_event_name {
-                    format!("{}: {}", preview.event_id.event_name, preview.copy_text)
+                    format!("{}: {}", preview.display_name, preview.copy_text)
                 } else {
                     preview.copy_text.clone()
                 };
@@ -232,7 +223,6 @@ pub fn render_toast_notifications(ui: &Ui) {
         let state = NOTIFICATION_STATE.lock();
         let display_size = ui.io().display_size;
 
-        // Determine starting index (1 if preview is showing, 0 otherwise)
         let start_index = if state.preview_toast.is_some() { 1 } else { 0 };
 
         for (index, toast) in state.toast_queue.iter().enumerate() {
@@ -247,7 +237,7 @@ pub fn render_toast_notifications(ui: &Ui) {
             let action = render_single_toast(ui, toast, pos, toast_size, &notification_config);
             if action.copy_clicked && !toast.copy_text.is_empty() {
                 let copy_text = if copy_with_event_name {
-                    format!("{}: {}", toast.event_id.event_name, toast.copy_text)
+                    format!("{}: {}", toast.display_name, toast.copy_text)
                 } else {
                     toast.copy_text.clone()
                 };
@@ -259,12 +249,10 @@ pub fn render_toast_notifications(ui: &Ui) {
         }
     }
 
-    // Copy to clipboard outside of lock
     if let Some(text) = copy_text_to_set {
         ui.set_clipboard_text(&text);
     }
 
-    // Dismiss toasts outside of render lock
     if !toasts_to_dismiss.is_empty() {
         let mut state = NOTIFICATION_STATE.lock();
         for id in toasts_to_dismiss {
@@ -277,18 +265,21 @@ pub fn render_toast_notifications(ui: &Ui) {
 
 // Thread-local state for context menu in upcoming panel
 thread_local! {
-    static UPCOMING_CONTEXT_EVENT: std::cell::RefCell<Option<crate::config::TrackedEventId>> = std::cell::RefCell::new(None);
-    static UPCOMING_OPEN_MENU: std::cell::Cell<bool> = std::cell::Cell::new(false);
+    static UPCOMING_CONTEXT_EVENT: std::cell::RefCell<Option<(crate::config::TrackedEventId, String)>> = const { std::cell::RefCell::new(None) };
+    static UPCOMING_OPEN_MENU: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// Render the upcoming events panel
 pub fn render_upcoming_panel(ui: &Ui) {
-    let (panel_enabled, panel_size, copy_with_event_name) = {
+    let (panel_enabled, panel_size, panel_mode, copy_with_event_name, tracked_set, favorite_set) = {
         let config = RUNTIME_CONFIG.lock();
         (
             config.notification_config.upcoming_panel_enabled,
             config.notification_config.upcoming_panel_size,
+            config.notification_config.upcoming_panel_mode,
             config.copy_with_event_name,
+            config.tracked_events.clone(),
+            config.favorite_events.clone(),
         )
     };
 
@@ -296,9 +287,10 @@ pub fn render_upcoming_panel(ui: &Ui) {
         return;
     }
 
-    // Collect actions to perform outside of lock
     let mut copy_text_to_set: Option<String> = None;
-    let mut event_to_untrack: Option<crate::config::TrackedEventId> = None;
+    let mut event_to_toggle_track: Option<crate::config::TrackedEventId> = None;
+    let mut event_to_toggle_fav: Option<crate::config::TrackedEventId> = None;
+    let mut event_to_toggle_done: Option<crate::config::TrackedEventId> = None;
     let mut wiki_to_open: Option<String> = None;
     let upcoming_events = NOTIFICATION_STATE.lock().upcoming_events.clone();
 
@@ -309,13 +301,23 @@ pub fn render_upcoming_panel(ui: &Ui) {
         .opened(&mut opened)
         .build(ui, || {
             if upcoming_events.is_empty() {
-                ui.text_disabled("No tracked events");
-                ui.text_disabled("Right-click events in timeline to track");
+                match panel_mode {
+                    UpcomingPanelMode::TrackedOnly => {
+                        ui.text_disabled("No tracked events");
+                        ui.text_disabled("Right-click events in timeline to track");
+                    }
+                    UpcomingPanelMode::TrackedAndFavorites => {
+                        ui.text_disabled("No tracked or favorite events");
+                        ui.text_disabled("Right-click events in timeline to track/favorite");
+                    }
+                    UpcomingPanelMode::AllVisibleEvents => {
+                        ui.text_disabled("No upcoming events in visible tracks");
+                    }
+                }
                 return;
             }
 
             for event in &upcoming_events {
-                // Event row with color indicator
                 let draw_list = ui.get_window_draw_list();
                 let cursor_pos = ui.cursor_screen_pos();
 
@@ -331,12 +333,10 @@ pub fn render_upcoming_panel(ui: &Ui) {
 
                 ui.set_cursor_pos([ui.cursor_pos()[0] + 8.0, ui.cursor_pos()[1]]);
 
-                // Time display - show time until or time since started
+                // Time display
                 let (time_text, time_color) =
                     format_event_time(event.seconds_until, event.seconds_into);
                 ui.text_colored(time_color, &time_text);
-
-                // Check for clicks on time text
                 let time_hovered = ui.is_item_hovered();
 
                 ui.same_line();
@@ -346,8 +346,10 @@ pub fn render_upcoming_panel(ui: &Ui) {
                     &event.event_id.track_name,
                     &event.event_id.event_name,
                 );
+                let is_favorite = favorite_set.contains(&event.event_id);
+
                 if completed {
-                    ui.text_colored([0.52, 0.52, 0.52, 1.0], &event.event_id.event_name);
+                    ui.text_colored([0.52, 0.52, 0.52, 1.0], &event.display_name);
                     let min = ui.item_rect_min();
                     let max = ui.item_rect_max();
                     draw_list
@@ -358,21 +360,26 @@ pub fn render_upcoming_panel(ui: &Ui) {
                         )
                         .thickness(1.5)
                         .build();
+                } else if is_favorite {
+                    ui.text_colored([1.0, 0.85, 0.25, 1.0], &event.display_name);
                 } else {
-                    ui.text(&event.event_id.event_name);
+                    ui.text(&event.display_name);
                 }
 
-                // Check for clicks on event name
                 let name_hovered = ui.is_item_hovered();
-
                 let row_hovered = time_hovered || name_hovered;
 
-                // Tooltip with full info
                 if row_hovered {
                     ui.tooltip(|| {
-                        ui.text(&event.event_id.display_name());
+                        ui.text(format!(
+                            "{}: {}",
+                            event.event_id.track_name, event.display_name
+                        ));
                         ui.separator();
                         ui.text(format!("Starts: {}", format_time_only(event.start_time)));
+                        if completed {
+                            ui.text_colored([0.5, 0.9, 0.5, 1.0], "Status: Completed today");
+                        }
                         if !event.copy_text.is_empty() {
                             ui.text(format!("Waypoint: {}", event.copy_text));
                             ui.separator();
@@ -382,24 +389,21 @@ pub fn render_upcoming_panel(ui: &Ui) {
                     });
                 }
 
-                // Left-click: copy waypoint (respects copy_with_event_name setting)
                 if row_hovered && ui.is_mouse_clicked(MouseButton::Left) {
                     if !event.copy_text.is_empty() {
                         if copy_with_event_name {
-                            copy_text_to_set = Some(format!(
-                                "{}: {}",
-                                event.event_id.event_name, event.copy_text
-                            ));
+                            copy_text_to_set =
+                                Some(format!("{}: {}", event.display_name, event.copy_text));
                         } else {
                             copy_text_to_set = Some(event.copy_text.clone());
                         }
                     }
                 }
 
-                // Right-click: open context menu
                 if row_hovered && ui.is_mouse_clicked(MouseButton::Right) {
                     UPCOMING_CONTEXT_EVENT.with(|e| {
-                        *e.borrow_mut() = Some(event.event_id.clone());
+                        *e.borrow_mut() =
+                            Some((event.event_id.clone(), event.display_name.clone()));
                     });
                     UPCOMING_OPEN_MENU.with(|f| f.set(true));
                 }
@@ -407,7 +411,6 @@ pub fn render_upcoming_panel(ui: &Ui) {
                 ui.separator();
             }
 
-            // Render context menu
             let should_open = UPCOMING_OPEN_MENU.with(|f| {
                 let val = f.get();
                 if val {
@@ -422,14 +425,44 @@ pub fn render_upcoming_panel(ui: &Ui) {
 
             ui.popup("##upcoming_context_menu", || {
                 let context_event = UPCOMING_CONTEXT_EVENT.with(|e| e.borrow().clone());
-                if let Some(event_id) = context_event {
-                    ui.text_disabled(&event_id.event_name);
+                if let Some((event_id, display_name)) = context_event {
+                    ui.text_disabled(&display_name);
                     ui.separator();
 
-                    if MenuItem::new("Untrack Event").build(ui) {
-                        event_to_untrack = Some(event_id.clone());
+                    let is_done = crate::completion::is_manually_completed(
+                        &event_id.track_name,
+                        &event_id.event_name,
+                    );
+                    let done_label = if is_done {
+                        "Unmark Done Today"
+                    } else {
+                        "Mark as Done Today"
+                    };
+                    if MenuItem::new(done_label).build(ui) {
+                        event_to_toggle_done = Some(event_id.clone());
                     }
 
+                    let is_tracked = tracked_set.contains(&event_id);
+                    let track_label = if is_tracked {
+                        "Untrack Event"
+                    } else {
+                        "Track Event"
+                    };
+                    if MenuItem::new(track_label).build(ui) {
+                        event_to_toggle_track = Some(event_id.clone());
+                    }
+
+                    let is_fav = favorite_set.contains(&event_id);
+                    let fav_label = if is_fav {
+                        "Unfavorite Event"
+                    } else {
+                        "Favorite Event"
+                    };
+                    if MenuItem::new(fav_label).build(ui) {
+                        event_to_toggle_fav = Some(event_id.clone());
+                    }
+
+                    ui.separator();
                     if MenuItem::new("Open Wiki").build(ui) {
                         wiki_to_open = Some(event_id.event_name.clone());
                     }
@@ -442,19 +475,23 @@ pub fn render_upcoming_panel(ui: &Ui) {
         config.notification_config.upcoming_panel_enabled = false;
     }
 
-    // Copy to clipboard outside of lock
     if let Some(text) = copy_text_to_set {
         ui.set_clipboard_text(&text);
     }
 
-    // Untrack event outside of lock
-    if let Some(event_id) = event_to_untrack {
-        let mut config = RUNTIME_CONFIG.lock();
-        config.tracked_events.remove(&event_id);
-        config.oneshot_events.remove(&event_id);
+    if let Some(event_id) = event_to_toggle_done {
+        crate::completion::toggle_manual_completion(&event_id.track_name, &event_id.event_name);
+        NOTIFICATION_STATE.lock().force_refresh();
     }
 
-    // Open wiki outside of lock
+    if let Some(event_id) = event_to_toggle_track {
+        toggle_event_tracking(&event_id.track_name, &event_id.event_name);
+    }
+
+    if let Some(event_id) = event_to_toggle_fav {
+        toggle_event_favorite(&event_id.track_name, &event_id.event_name);
+    }
+
     if let Some(event_name) = wiki_to_open {
         let search_query = event_name.replace(' ', "+");
         let url = format!("https://wiki.guildwars2.com/wiki/?search={}", search_query);
@@ -466,7 +503,6 @@ pub fn render_upcoming_panel(ui: &Ui) {
 /// Shows time until event, or time since it started if active
 fn format_event_time(seconds_until: i64, seconds_into: i64) -> (String, [f32; 4]) {
     if seconds_until <= 0 && seconds_into > 0 {
-        // Event is active - show time since it started
         let text = if seconds_into < 60 {
             format!("{}s ago", seconds_into)
         } else if seconds_into < 3600 {
@@ -477,13 +513,10 @@ fn format_event_time(seconds_until: i64, seconds_into: i64) -> (String, [f32; 4]
             let mins = (seconds_into % 3600) / 60;
             format!("{}h {}m ago", hours, mins)
         };
-        // Yellow/orange color for active events
         (text, [1.0, 0.8, 0.2, 1.0])
     } else if seconds_until <= 0 {
-        // Just started
         ("NOW".to_string(), [0.5, 1.0, 0.5, 1.0])
     } else {
-        // Event upcoming
         let text = if seconds_until < 60 {
             format!("{}s", seconds_until)
         } else if seconds_until < 3600 {
@@ -499,7 +532,6 @@ fn format_event_time(seconds_until: i64, seconds_into: i64) -> (String, [f32; 4]
             let mins = (seconds_until % 3600) / 60;
             format!("{}h {}m", hours, mins)
         };
-        // Green color for upcoming events
         (text, [0.5, 1.0, 0.5, 1.0])
     }
 }

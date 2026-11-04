@@ -1,8 +1,7 @@
-// Add to lib.rs
-
 use nexus::{
     gui::{register_render, render, RenderType},
     keybind::register_keybind_with_string,
+    paths::get_addon_dir,
     quick_access::add_quick_access,
     texture::load_texture_from_memory,
     AddonFlags, UpdateProvider,
@@ -130,8 +129,10 @@ fn load() {
             while !BG_STOP.load(Ordering::Relaxed) {
                 let (has_targets, any_surface_enabled) = {
                     let config = RUNTIME_CONFIG.lock();
-                    let has_targets =
-                        !config.tracked_events.is_empty() || !config.oneshot_events.is_empty();
+                    // Keep scanning an open panel even after the final tracked event is removed.
+                    let has_targets = !config.tracked_events.is_empty()
+                        || !config.oneshot_events.is_empty()
+                        || config.notification_config.upcoming_panel_enabled;
                     let any_surface_enabled = config.notification_config.toast_enabled
                         || config.notification_config.upcoming_panel_enabled
                         || config.show_main_window;
@@ -188,6 +189,7 @@ fn sync_quick_access() {
 }
 
 fn unload() {
+    ui::settings::wait_for_schedule_update();
     BG_STOP.store(true, Ordering::Relaxed);
     if let Some(h) = BG_THREAD.lock().take() {
         let _ = h.join();
