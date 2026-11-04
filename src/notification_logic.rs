@@ -4,6 +4,8 @@ use crate::notifications::{UpcomingEvent, NOTIFICATION_STATE};
 use crate::time_utils::get_current_unix_time;
 use std::collections::HashMap;
 
+const UPCOMING_ACTIVE_GRACE_SECONDS: i64 = 5 * 60;
+
 fn insert_upcoming(
     upcoming_by_event: &mut HashMap<TrackedEventId, UpcomingEvent>,
     upcoming: UpcomingEvent,
@@ -15,7 +17,7 @@ fn insert_upcoming(
         }
         Some(existing)
             if upcoming.seconds_until == existing.seconds_until
-                && upcoming.seconds_into > existing.seconds_into =>
+                && upcoming.seconds_into < existing.seconds_into =>
         {
             *existing = upcoming;
         }
@@ -24,6 +26,57 @@ fn insert_upcoming(
         }
         _ => {}
     }
+}
+
+fn upcoming_event_for_panel(
+    event_id: TrackedEventId,
+    display_name: String,
+    event: &TimelineEvent,
+    current_time: i64,
+    start_time: i64,
+    seconds_until: i64,
+    seconds_into_event: i64,
+) -> Option<UpcomingEvent> {
+    let (panel_start_time, panel_seconds_until, panel_seconds_into) =
+        if seconds_into_event > UPCOMING_ACTIVE_GRACE_SECONDS {
+            let next_seconds_until = event.cycle_duration.checked_sub(seconds_into_event)?;
+            if next_seconds_until <= 0 {
+                return None;
+            }
+            let next_start_time = current_time.checked_add(next_seconds_until)?;
+            (next_start_time, next_seconds_until, 0)
+        } else {
+            (
+                start_time,
+                seconds_until,
+                if seconds_into_event >= 0 {
+                    seconds_into_event
+                } else {
+                    0
+                },
+            )
+        };
+
+    Some(UpcomingEvent {
+        start_time: panel_start_time,
+        event_id,
+        display_name,
+        seconds_until: panel_seconds_until,
+        seconds_into: panel_seconds_into,
+        color: event.color.to_array(),
+        copy_text: event.copy_text.clone(),
+    })
+}
+
+fn sort_upcoming_events(upcoming: &mut [UpcomingEvent]) {
+    upcoming.sort_by(|a, b| {
+        a.seconds_until
+            .cmp(&b.seconds_until)
+            .then_with(|| a.seconds_into.cmp(&b.seconds_into))
+            .then_with(|| a.display_name.cmp(&b.display_name))
+            .then_with(|| a.event_id.track_name.cmp(&b.event_id.track_name))
+            .then_with(|| a.event_id.event_name.cmp(&b.event_id.event_name))
+    });
 }
 
 /// Background update function - called by maintenance ticker.
@@ -114,20 +167,17 @@ pub fn update_notifications() {
                 if include_in_upcoming
                     && !(notification_config.hide_completed_in_upcoming && is_completed)
                 {
-                    let upcoming = UpcomingEvent {
+                    if let Some(upcoming) = upcoming_event_for_panel(
+                        event_id.clone(),
+                        disp_name.clone(),
+                        event,
+                        current_time,
                         start_time,
-                        event_id: event_id.clone(),
-                        display_name: disp_name.clone(),
                         seconds_until,
-                        seconds_into: if seconds_into_event >= 0 {
-                            seconds_into_event
-                        } else {
-                            0
-                        },
-                        color: event.color.to_array(),
-                        copy_text: event.copy_text.clone(),
-                    };
-                    insert_upcoming(&mut upcoming_by_event, upcoming);
+                        seconds_into_event,
+                    ) {
+                        insert_upcoming(&mut upcoming_by_event, upcoming);
+                    }
                 }
 
                 // Only fire toast reminders for tracked or one-shot events
@@ -226,12 +276,9 @@ pub fn update_notifications() {
 
     let mut upcoming = upcoming_by_event.into_values().collect::<Vec<_>>();
 
-    // Sort by time (active events with seconds_until == 0 first, then soonest upcoming)
-    upcoming.sort_by(|a, b| {
-        a.seconds_until
-            .cmp(&b.seconds_until)
-            .then_with(|| b.seconds_into.cmp(&a.seconds_into))
-    });
+    // Sort by time (active events with seconds_until == 0 first, then soonest upcoming),
+    // with a deterministic tie-breaker so simultaneous events never swap order.
+    sort_upcoming_events(&mut upcoming);
 
     // Limit to max configured
     upcoming.truncate(notification_config.max_upcoming_events);
@@ -424,5 +471,90 @@ mod tests {
         insert_upcoming(&mut events, upcoming(3600));
         assert_eq!(events.len(), 1);
         assert_eq!(events.values().next().unwrap().seconds_until, 600);
+    }
+
+    #[test]
+    fn events_started_more_than_five_minutes_ago_roll_over_to_next_start() {
+        let track = EventTrack {
+            name: "Dragon's Stand".into(),
+            timeline_type: TimelineType::RealTime,
+            events: Vec::new(),
+            base_time: 0,
+            visible: true,
+            height: 20.0,
+            category: "Heart of Thorns".into(),
+        };
+        let slot_a = TimelineEvent {
+            name: "Advancing on the Blighting Towers".into(),
+            custom_name: None,
+            start_offset: 90 * 60,
+            duration: 120 * 60,
+            cycle_duration: 1440 * 60,
+            color: EventColor::default(),
+            copy_text: String::new(),
+            enabled: true,
+        };
+        let slot_b = TimelineEvent {
+            name: "Advancing on the Blighting Towers".into(),
+            custom_name: None,
+            start_offset: 210 * 60,
+            duration: 120 * 60,
+            cycle_duration: 1440 * 60,
+            color: EventColor::default(),
+            copy_text: String::new(),
+            enabled: true,
+        };
+
+        // 1h45m into slot_a (195m since midnight), 15m before slot_b starts at 210m
+        let current_time = 195 * 60;
+        let event_id = TrackedEventId::new(&track.name, "Advancing on the Blighting Towers");
+        let mut upcoming_by_event = HashMap::new();
+
+        for slot in [&slot_a, &slot_b] {
+            let (start_time, seconds_until, seconds_into, _, _) =
+                calculate_event_timing(&track, slot, current_time).unwrap();
+            if let Some(entry) = upcoming_event_for_panel(
+                event_id.clone(),
+                slot.display_name().to_string(),
+                slot,
+                current_time,
+                start_time,
+                seconds_until,
+                seconds_into,
+            ) {
+                insert_upcoming(&mut upcoming_by_event, entry);
+            }
+        }
+
+        let chosen = upcoming_by_event.get(&event_id).unwrap();
+        assert_eq!(chosen.seconds_until, 15 * 60);
+        assert_eq!(chosen.seconds_into, 0);
+    }
+
+    #[test]
+    fn simultaneous_events_sort_deterministically() {
+        let mut list = vec![
+            UpcomingEvent {
+                event_id: TrackedEventId::new("Track B", "Event Z"),
+                display_name: "Zeta".into(),
+                start_time: 1000,
+                seconds_until: 300,
+                seconds_into: 0,
+                color: [1.0; 4],
+                copy_text: String::new(),
+            },
+            UpcomingEvent {
+                event_id: TrackedEventId::new("Track A", "Event A"),
+                display_name: "Alpha".into(),
+                start_time: 1000,
+                seconds_until: 300,
+                seconds_into: 0,
+                color: [1.0; 4],
+                copy_text: String::new(),
+            },
+        ];
+        sort_upcoming_events(&mut list);
+        assert_eq!(list[0].display_name, "Alpha");
+        assert_eq!(list[1].display_name, "Zeta");
     }
 }
