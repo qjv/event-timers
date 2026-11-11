@@ -68,7 +68,9 @@ nexus::export! {
     signature: -0x45564E54,
     load,
     unload,
-    flags: AddonFlags::None,
+    // Async texture callbacks and HTTP runtime threads can outlive unload().
+    // Keep their code mapped; Nexus will apply binary updates after a restart.
+    flags: AddonFlags::DisableHotloading,
     provider: UpdateProvider::GitHub,
     update_link: "https://github.com/qjv/event-timers",
 }

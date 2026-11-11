@@ -139,6 +139,8 @@ impl Default for EventTrack {
 #[derive(Deserialize, Debug)]
 struct JsonSchedule {
     name: String,
+    #[serde(default)]
+    custom_name: Option<String>,
     offset: i32,
     #[serde(default)]
     interval: i32,
@@ -279,7 +281,7 @@ fn expand_schedule(schedule: &JsonSchedule, cycle_minutes: i32) -> Vec<TimelineE
         // Single event, no repetition
         return vec![TimelineEvent {
             name: schedule.name.clone(),
-            custom_name: None,
+            custom_name: schedule.custom_name.clone(),
             start_offset: i64::from(schedule.offset.rem_euclid(cycle_minutes)) * 60,
             duration: i64::from(schedule.duration) * 60,
             cycle_duration: i64::from(cycle_minutes) * 60,
@@ -300,7 +302,7 @@ fn expand_schedule(schedule: &JsonSchedule, cycle_minutes: i32) -> Vec<TimelineE
     while spawn_time < cycle_minutes {
         events.push(TimelineEvent {
             name: schedule.name.clone(),
-            custom_name: None,
+            custom_name: schedule.custom_name.clone(),
             start_offset: i64::from(spawn_time) * 60,
             duration: i64::from(schedule.duration) * 60,
             cycle_duration: i64::from(cycle_minutes) * 60,
@@ -319,6 +321,92 @@ pub fn get_json_path() -> Option<PathBuf> {
     get_addon_dir("event_timers").map(|p| p.join("event_tracks.json"))
 }
 
+// Preserve JSON display names independently of schedule versions. Legacy edits to
+// `name` can be recognized only when a unique event has the same timing/waypoint.
+fn preserve_event_names(existing: &str, incoming: &str) -> String {
+    use serde_json::Value;
+    let (Ok(old), Ok(mut new)) = (
+        serde_json::from_str::<Value>(existing),
+        serde_json::from_str::<Value>(incoming),
+    ) else {
+        return incoming.to_string();
+    };
+    let mut changed = false;
+    if let (Some(old_categories), Some(new_categories)) = (
+        old["categories"].as_array(),
+        new["categories"].as_array_mut(),
+    ) {
+        for category in new_categories {
+            let Some(old_category) = old_categories
+                .iter()
+                .find(|c| c["name"] == category["name"])
+            else {
+                continue;
+            };
+            let (Some(old_tracks), Some(new_tracks)) = (
+                old_category["tracks"].as_array(),
+                category["tracks"].as_array_mut(),
+            ) else {
+                continue;
+            };
+            for track in new_tracks {
+                let Some(old_track) = old_tracks.iter().find(|t| t["name"] == track["name"]) else {
+                    continue;
+                };
+                for (key, timing) in [
+                    ("schedules", &["offset", "interval", "duration"][..]),
+                    (
+                        "events",
+                        &["start_offset", "cycle_duration", "duration"][..],
+                    ),
+                ] {
+                    let (Some(old_events), Some(new_events)) =
+                        (old_track[key].as_array(), track[key].as_array_mut())
+                    else {
+                        continue;
+                    };
+                    for event in new_events {
+                        let same_name = old_events.iter().find(|e| e["name"] == event["name"]);
+                        let matched = same_name.or_else(|| {
+                            let mut candidates = old_events.iter().filter(|e| {
+                                e["copy_text"].as_str().unwrap_or_default()
+                                    == event["copy_text"].as_str().unwrap_or_default()
+                                    && timing.iter().all(|field| e[*field] == event[*field])
+                            });
+                            let first = candidates.next()?;
+                            if candidates.next().is_some() {
+                                None
+                            } else {
+                                Some(first)
+                            }
+                        });
+                        if let Some(previous) = matched {
+                            let custom_name = previous["custom_name"]
+                                .as_str()
+                                .filter(|s| !s.trim().is_empty());
+                            if let Some(name) = custom_name {
+                                event["custom_name"] = Value::String(name.to_string());
+                                changed = true;
+                            }
+                            if previous["name"] != event["name"] {
+                                // Retain the legacy identity too, so saved tracking
+                                // and UI overrides still refer to the renamed event.
+                                event["name"] = previous["name"].clone();
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if changed {
+        serde_json::to_string_pretty(&new).unwrap_or_else(|_| incoming.to_string())
+    } else {
+        incoming.to_string()
+    }
+}
+
 pub fn atomic_write_event_tracks(path: &PathBuf, content: &str) -> Result<(), String> {
     let _write_guard = JSON_WRITE_LOCK.lock();
     if !is_valid_event_tracks_json(content) {
@@ -327,17 +415,19 @@ pub fn atomic_write_event_tracks(path: &PathBuf, content: &str) -> Result<(), St
     if let Some(dir) = path.parent() {
         fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     }
+    let mut content = content.to_string();
     // Only back up existing file if it is valid JSON (never overwrite backup with a 429 error!)
     if path.exists() {
         if let Ok(existing) = fs::read_to_string(path) {
             if is_valid_event_tracks_json(&existing) {
+                content = preserve_event_names(&existing, &content);
                 let backup_path = path.with_extension("json.backup");
                 let _ = fs::copy(path, backup_path);
             }
         }
     }
     let tmp_path = path.with_extension("json.tmp");
-    fs::write(&tmp_path, content).map_err(|e| format!("Failed to write temp file: {e}"))?;
+    fs::write(&tmp_path, &content).map_err(|e| format!("Failed to write temp file: {e}"))?;
     fs::OpenOptions::new()
         .write(true)
         .open(&tmp_path)
@@ -366,7 +456,7 @@ fn load_json_content() -> String {
                             *JSON_LOAD_NOTICE.lock() =
                                 Some(format!("Using built-in schedule ({err})"));
                         }
-                        return EMBEDDED_JSON.to_string();
+                        return preserve_event_names(&disk_content, EMBEDDED_JSON);
                     }
                     (None, _) => {
                         // On-disk JSON was corrupted (e.g., 429 error text). Recover from backup or embedded.
@@ -375,12 +465,15 @@ fn load_json_content() -> String {
                             if let (Some(bak_ver), Some(emb_ver)) =
                                 (parse_event_tracks_version(&backup_content), embedded_ver)
                             {
-                                if bak_ver > emb_ver {
-                                    let _ = atomic_write_event_tracks(&path, &backup_content);
-                                    *JSON_LOAD_NOTICE.lock() =
-                                        Some("Recovered event_tracks.json from backup".to_string());
-                                    return backup_content;
-                                }
+                                let recovered = if bak_ver >= emb_ver {
+                                    backup_content
+                                } else {
+                                    preserve_event_names(&backup_content, EMBEDDED_JSON)
+                                };
+                                let _ = atomic_write_event_tracks(&path, &recovered);
+                                *JSON_LOAD_NOTICE.lock() =
+                                    Some("Recovered event_tracks.json from backup".to_string());
+                                return recovered;
                             }
                         }
                         let _ = atomic_write_event_tracks(&path, EMBEDDED_JSON);
@@ -460,6 +553,7 @@ mod tests {
     fn schedule(offset: i32, interval: i32, duration: i32) -> JsonSchedule {
         JsonSchedule {
             name: "Test".into(),
+            custom_name: None,
             offset,
             interval,
             duration,
@@ -484,6 +578,60 @@ mod tests {
         assert!(expand_schedule(&schedule(0, -1, 5), 1440).is_empty());
         assert!(expand_schedule(&schedule(0, 15, 0), 1440).is_empty());
         assert!(expand_schedule(&schedule(0, 15, 5), 0).is_empty());
+    }
+
+    #[test]
+    fn json_display_names_apply_to_single_and_repeating_schedules() {
+        for interval in [0, 120] {
+            let mut schedule = schedule(0, interval, 5);
+            schedule.custom_name = Some("My event".into());
+            let events = expand_schedule(&schedule, 1440);
+            assert!(!events.is_empty());
+            assert!(events
+                .iter()
+                .all(|e| e.name == "Test" && e.display_name() == "My event"));
+        }
+    }
+
+    #[test]
+    fn schedule_updates_preserve_json_names_without_reverting_new_timing() {
+        use serde_json::{json, Value};
+        let incoming = json!({"categories": [{"name": "Test", "tracks": [{
+            "name": "Track", "schedules": [
+                {"name": "Original", "offset": 10, "interval": 120, "duration": 5},
+                {"name": "Other", "offset": 20, "interval": 120, "duration": 15}
+            ], "events": [{"name": "Direct", "start_offset": 0, "duration": 60, "cycle_duration": 7200}]
+        }]}]});
+        let mut existing = incoming.clone();
+        let track = &mut existing["categories"][0]["tracks"][0];
+        track["schedules"][0]["name"] = json!("My legacy name");
+        track["schedules"][1]["custom_name"] = json!("My display name");
+        track["schedules"][1]["duration"] = json!(10);
+        track["events"][0]["name"] = json!("My direct event");
+        let merged: Value = serde_json::from_str(&preserve_event_names(
+            &existing.to_string(),
+            &incoming.to_string(),
+        ))
+        .unwrap();
+        let track = &merged["categories"][0]["tracks"][0];
+        assert_eq!(track["schedules"][0]["name"], "My legacy name");
+        assert_eq!(track["schedules"][1]["custom_name"], "My display name");
+        assert_eq!(track["schedules"][1]["duration"], 15);
+        assert_eq!(track["events"][0]["name"], "My direct event");
+    }
+
+    #[test]
+    fn ambiguous_legacy_renames_are_not_assigned_to_another_event() {
+        let existing = r#"{"categories":[{"name":"C","tracks":[{"name":"T","schedules":[
+            {"name":"A","offset":0,"interval":60,"duration":5},
+            {"name":"B","offset":0,"interval":60,"duration":5}
+        ]}]}]}"#;
+        let incoming = existing.replace("\"A\"", "\"New\"");
+        assert_eq!(preserve_event_names(existing, &incoming), incoming);
+        assert_eq!(
+            preserve_event_names("429: Too Many Requests", &incoming),
+            incoming
+        );
     }
 
     #[test]
@@ -514,6 +662,17 @@ mod tests {
         assert_eq!(
             fs::read_to_string(path.with_extension("json.backup")).unwrap(),
             EMBEDDED_JSON
+        );
+        let mut customized: serde_json::Value = serde_json::from_str(EMBEDDED_JSON).unwrap();
+        customized["categories"][0]["tracks"][0]["schedules"][0]["custom_name"] =
+            "My JSON name".into();
+        fs::write(&path, customized.to_string()).unwrap();
+        atomic_write_event_tracks(&path, EMBEDDED_JSON).unwrap();
+        let written: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(
+            written["categories"][0]["tracks"][0]["schedules"][0]["custom_name"],
+            "My JSON name"
         );
         fs::remove_dir_all(dir).unwrap();
     }
