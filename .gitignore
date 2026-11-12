@@ -17,3 +17,6 @@ target/
 #.idea/
 /.claude
 NUL
+
+# Nix dev shell artifacts
+/.direnv
